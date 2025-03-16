@@ -35,61 +35,53 @@ export default function HomeScreen({ navigation, route, mode }) {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        console.log("HomeScreen: Buscando dados, modo atual:", mode);
         const camposData = await campoService.getCampos();
-        const turmasData = await turmaService.getTurmas();
-        const aulasData = await escolinhaService.getAulas();
-        const horario = await configService.getHorarioFuncionamento();
-
-        console.log("HomeScreen: Campos carregados:", camposData);
-        console.log("HomeScreen: Turmas carregadas:", turmasData);
-        console.log("HomeScreen: Aulas carregadas:", aulasData);
+        let turmasOuAulasData = [];
+        if (mode === "turmas") {
+          turmasOuAulasData = await turmaService.getTurmas();
+          console.log(
+            "HomeScreen: Turmas carregadas:",
+            turmasOuAulasData.length
+          );
+        } else {
+          turmasOuAulasData = await escolinhaService.getAulas();
+          console.log(
+            "HomeScreen: Aulas carregadas:",
+            turmasOuAulasData.length
+          );
+        }
 
         setCampos(camposData);
-        setTurmasOuAulas(mode === "turmas" ? turmasData : aulasData);
-        setTodosHorarios([...turmasData, ...aulasData]);
-        setHorarioInicio(horario.inicio);
-        setHorarioFim(horario.fim);
+        setTurmasOuAulas(turmasOuAulasData);
 
-        // Verificar conflitos
-        const conflitosEncontrados = [];
-        turmasData.forEach((turma) => {
-          aulasData.forEach((aula) => {
-            if (checkHorarioConflito(turma, aula)) {
-              conflitosEncontrados.push({
-                turma: turma.nome,
-                aula: aula.nome,
-                campoId: turma.campoId,
-                dia: turma.dia,
-                horario: `${turma.inicio}-${turma.fim}`,
-              });
-            }
-          });
-        });
-        setConflitos(conflitosEncontrados);
-        console.log(
-          conflitosEncontrados.length > 0
-            ? "HomeScreen: Conflitos de horário encontrados:"
-            : "HomeScreen: Nenhum conflito de horário encontrado.",
-          conflitosEncontrados
+        const conflitos = turmasOuAulasData.filter((item, index, self) =>
+          self.some(
+            (other, otherIndex) =>
+              index !== otherIndex &&
+              item.dia === other.dia &&
+              item.campoId === other.campoId &&
+              checkHorarioConflito(item, other)
+          )
         );
+        if (conflitos.length > 0) {
+          console.log(
+            "HomeScreen: Conflitos de horário encontrados:",
+            conflitos
+          );
+        } else {
+          console.log("HomeScreen: Nenhum conflito de horário encontrado.");
+        }
       } catch (error) {
         console.error("HomeScreen: Erro ao carregar dados:", error);
       } finally {
         setLoading(false);
       }
     };
-    fetchData();
 
-    navigation.setParams({
-      openAddModal: () => {
-        console.log("HomeScreen: Abrindo modal de adicionar campo");
-        setAddModalVisible(true);
-      },
-      openConfigModal: () => {
-        console.log("HomeScreen: Abrindo modal de configurar horários");
-        setConfigModalVisible(true);
-      },
-    });
+    fetchData();
+    const unsubscribe = navigation.addListener("focus", fetchData);
+    return () => unsubscribe();
   }, [navigation, mode]);
 
   const isEmAtraso = (createdAt) => {
@@ -103,19 +95,19 @@ export default function HomeScreen({ navigation, route, mode }) {
 
   const emAtraso = turmasOuAulas.filter((item) => isEmAtraso(item.createdAt));
 
-  const handleCampoPress = (campo) => {
-    console.log("HomeScreen: Clicou no campo:", campo);
-    if (!campo) {
-      console.error("HomeScreen: Campo é undefined!");
-      return;
-    }
-    navigation.navigate("CampoDetail", { campo, turmas: turmasOuAulas });
-  };
-
   const handleLongPressCampo = (campo) => {
     console.log("HomeScreen: Long press no campo:", campo);
     setCampoParaExcluir(campo);
     setModalVisible(true);
+  };
+
+  const handleCampoPress = (campo) => {
+    console.log("HomeScreen: Clicou no campo:", campo, "Modo:", mode);
+    if (!campo) {
+      console.error("HomeScreen: Campo é undefined!");
+      return;
+    }
+    navigation.navigate("CampoDetail", { campo, turmas: turmasOuAulas, mode });
   };
 
   // src/screens/HomeScreen.js (apenas a parte relevante)

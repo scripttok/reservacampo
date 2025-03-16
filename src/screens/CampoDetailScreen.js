@@ -10,11 +10,19 @@ import {
   Animated,
 } from "react-native";
 import { turmaService } from "../services/turmaService";
+import { escolinhaService } from "../services/escolinhaService";
 import { configService } from "../services/configService";
 
 export default function CampoDetailScreen({ route, navigation }) {
-  const { campo, turmas, diaSelecionado: diaInicial, itemId } = route.params; // Renomeado para evitar confusão
-  const [turmasDoCampo, setTurmasDoCampo] = useState(turmas); // Usar turmas passadas inicialmente
+  const {
+    campo,
+    turmas: initialTurmas,
+    diaSelecionado: diaInicial,
+    itemId,
+    mode = "turmas",
+  } = route.params || {};
+  const [turmasDoCampo, setTurmasDoCampo] = useState(initialTurmas || []);
+  const [aulasDoCampo, setAulasDoCampo] = useState([]);
   const [horarioFuncionamento, setHorarioFuncionamento] = useState({
     inicio: "09:00",
     fim: "23:00",
@@ -37,37 +45,49 @@ export default function CampoDetailScreen({ route, navigation }) {
   useEffect(() => {
     const fetchData = async () => {
       console.log(
-        "CampoDetailScreen: Buscando turmas para o campo:",
-        campo.nome
+        "CampoDetailScreen: Buscando dados para o campo:",
+        campo.nome,
+        "Modo:",
+        mode
       );
-      const updatedTurmas = await turmaService.getTurmas(); // Mantém a atualização do backend
+      const updatedTurmas = await turmaService.getTurmas();
+      const updatedAulas = await escolinhaService.getAulas();
       const horario = await configService.getHorarioFuncionamento();
+
+      const turmasFiltradas = updatedTurmas.filter(
+        (t) => t.campoId === campo.id
+      );
+      const aulasFiltradas = updatedAulas.filter((a) => a.campoId === campo.id);
+
       console.log(
         "CampoDetailScreen: Turmas carregadas:",
-        updatedTurmas.length
+        turmasFiltradas.length
       );
-      setTurmasDoCampo(updatedTurmas.filter((t) => t.campoId === campo.id)); // Filtra apenas turmas do campo
+      console.log(
+        "CampoDetailScreen: Aulas carregadas:",
+        aulasFiltradas.length
+      );
+      setTurmasDoCampo(turmasFiltradas);
+      setAulasDoCampo(aulasFiltradas);
       setHorarioFuncionamento(horario);
     };
 
     fetchData();
     const unsubscribe = navigation.addListener("focus", fetchData);
     return () => unsubscribe();
-  }, [navigation, campo.id]);
+  }, [navigation, campo.id, mode]);
 
-  const turmasDoDia = turmasDoCampo
-    .filter(
-      (t) => t.campoId === campo.id && t.dia.toLowerCase() === diaSelecionado
-    )
+  const itensDoDia = (mode === "turmas" ? turmasDoCampo : aulasDoCampo)
+    .filter((item) => item.dia.toLowerCase() === diaSelecionado)
     .sort((a, b) => a.inicio.localeCompare(b.inicio));
 
-  const calcularHorariosDisponiveis = (inicio, fim, turmasOcupadas) => {
+  const calcularHorariosDisponiveis = (inicio, fim, itensOcupados) => {
     const horarios = [];
     let currentTime = parseTime(inicio);
     const endTime = parseTime(fim);
 
     while (currentTime < endTime) {
-      const nextTime = new Date(currentTime.getTime() + 90 * 60 * 1000);
+      const nextTime = new Date(currentTime.getTime() + 90 * 60 * 1000); // Intervalo de 1h30
       if (nextTime <= endTime) {
         const horarioInicio = formatTime(currentTime);
         const horarioFim = formatTime(nextTime);
@@ -77,7 +97,7 @@ export default function CampoDetailScreen({ route, navigation }) {
     }
 
     return horarios.filter((horario) => {
-      return !turmasOcupadas.some((ocupado) =>
+      return !itensOcupados.some((ocupado) =>
         isOverlapping(horario.inicio, horario.fim, ocupado.inicio, ocupado.fim)
       );
     });
@@ -104,6 +124,35 @@ export default function CampoDetailScreen({ route, navigation }) {
     const end2 = parseTime(fim2);
     return start1 < end2 && start2 < end1;
   };
+
+  useEffect(() => {
+    // Combina turmas e aulas do dia selecionado para calcular horários ocupados
+    const itensOcupados = [
+      ...turmasDoCampo.filter(
+        (item) => item.dia.toLowerCase() === diaSelecionado
+      ),
+      ...aulasDoCampo.filter(
+        (item) => item.dia.toLowerCase() === diaSelecionado
+      ),
+    ].map((item) => ({
+      inicio: item.inicio,
+      fim: item.fim,
+    }));
+
+    console.log(
+      "CampoDetailScreen: Itens ocupados no dia",
+      diaSelecionado,
+      ":",
+      itensOcupados
+    );
+
+    const horariosLivres = calcularHorariosDisponiveis(
+      horarioFuncionamento.inicio,
+      horarioFuncionamento.fim,
+      itensOcupados
+    );
+    setHorariosDisponiveis(horariosLivres);
+  }, [turmasDoCampo, aulasDoCampo, diaSelecionado, horarioFuncionamento]);
 
   const formatarDataCriacao = (createdAt) => {
     if (!createdAt) return "Data não disponível";
@@ -155,25 +204,16 @@ export default function CampoDetailScreen({ route, navigation }) {
     ).start();
   }, [blinkAnim]);
 
-  useEffect(() => {
-    const horariosOcupados = turmasDoDia.map((turma) => ({
-      inicio: turma.inicio,
-      fim: turma.fim,
-    }));
-    const horariosLivres = calcularHorariosDisponiveis(
-      horarioFuncionamento.inicio,
-      horarioFuncionamento.fim,
-      horariosOcupados
-    );
-    setHorariosDisponiveis(horariosLivres);
-  }, [turmasDoCampo, diaSelecionado, horarioFuncionamento]);
-
   const handleDiaPress = (dia) => {
     setDiaSelecionado(dia);
   };
 
   const handleAddTurma = () => {
-    navigation.navigate("AddTurma", { campoId: campo.id, dia: diaSelecionado });
+    navigation.navigate("AddTurma", {
+      campoId: campo.id,
+      dia: diaSelecionado,
+      mode,
+    });
   };
 
   const handleHorarioPress = (horario) => {
@@ -182,20 +222,26 @@ export default function CampoDetailScreen({ route, navigation }) {
       dia: diaSelecionado,
       inicio: horario.inicio,
       fim: horario.fim,
+      mode,
     });
   };
 
-  const handleEditTurma = (turma) => {
-    navigation.navigate("AddTurma", { campoId: campo.id, turma });
+  const handleEditTurma = (item) => {
+    navigation.navigate("AddTurma", { campoId: campo.id, turma: item, mode });
   };
 
   const handleDeleteTurma = async (id) => {
     try {
-      await turmaService.deleteTurma(id);
-      setTurmasDoCampo(turmasDoCampo.filter((turma) => turma.id !== id));
+      if (mode === "turmas") {
+        await turmaService.deleteTurma(id);
+        setTurmasDoCampo(turmasDoCampo.filter((turma) => turma.id !== id));
+      } else {
+        await escolinhaService.deleteAula(id);
+        setAulasDoCampo(aulasDoCampo.filter((aula) => aula.id !== id));
+      }
     } catch (error) {
-      console.error("Erro ao deletar turma:", error);
-      alert("Erro ao deletar a turma.");
+      console.error("Erro ao deletar item:", error);
+      alert("Erro ao deletar o item.");
     }
   };
 
@@ -230,9 +276,13 @@ export default function CampoDetailScreen({ route, navigation }) {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>{campo.nome}</Text>
+        <Text style={styles.title}>
+          {campo.nome} ({mode === "turmas" ? "Turmas" : "Escolinha"})
+        </Text>
         <TouchableOpacity style={styles.addButton} onPress={handleAddTurma}>
-          <Text style={styles.addButtonText}>+ Adicionar Turma</Text>
+          <Text style={styles.addButtonText}>
+            + Adicionar {mode === "turmas" ? "Turma" : "Aula"}
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -258,57 +308,57 @@ export default function CampoDetailScreen({ route, navigation }) {
       />
 
       <View style={styles.turmasContainer}>
-        {turmasDoDia.length > 0 ? (
-          turmasDoDia.map((turma) => {
-            const emAtraso = isTurmaEmAtraso(turma.createdAt);
+        {itensDoDia.length > 0 ? (
+          itensDoDia.map((item) => {
+            const emAtraso = isTurmaEmAtraso(item.createdAt);
             return (
               <Animated.View
-                key={turma.id}
+                key={item.id}
                 style={[
                   styles.turmaCard,
                   emAtraso && {
                     backgroundColor: "#FF0000",
                     opacity: blinkAnim,
                   },
-                  turma.id === itemId && styles.turmaCardDestacada, // Destaque para o item clicado
+                  item.id === itemId && styles.turmaCardDestacada,
                 ]}
               >
                 <Text style={[styles.turmaTime, emAtraso && styles.textWhite]}>
-                  {turma.inicio} - {turma.fim}
+                  {item.inicio} - {item.fim}
                 </Text>
                 <Text style={[styles.turmaName, emAtraso && styles.textWhite]}>
-                  {turma.nome}
+                  {item.nome}
                 </Text>
                 <Text
                   style={[styles.turmaDetail, emAtraso && styles.textWhite]}
                 >
-                  Responsável: {turma.responsavel}
+                  Responsável: {item.responsavel}
                 </Text>
                 <Text
                   style={[styles.turmaDetail, emAtraso && styles.textWhite]}
                 >
-                  Telefone: {turma.telefone}
+                  Telefone: {item.telefone}
                 </Text>
                 <Text
                   style={[styles.turmaDetail, emAtraso && styles.textWhite]}
                 >
-                  Criado em: {formatarDataCriacao(turma.createdAt)}
+                  Criado em: {formatarDataCriacao(item.createdAt)}
                 </Text>
                 <Text
                   style={[styles.turmaDetail, emAtraso && styles.textWhite]}
                 >
-                  Próximo pagamento: {calcularProximoPagamento(turma.createdAt)}
+                  Próximo pagamento: {calcularProximoPagamento(item.createdAt)}
                 </Text>
                 <View style={styles.actions}>
                   <TouchableOpacity
                     style={styles.editButton}
-                    onPress={() => handleEditTurma(turma)}
+                    onPress={() => handleEditTurma(item)}
                   >
                     <Text style={styles.actionText}>Editar</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.deleteButton}
-                    onPress={() => handleDeleteTurma(turma.id)}
+                    onPress={() => handleDeleteTurma(item.id)}
                   >
                     <Text style={styles.actionText}>Excluir</Text>
                   </TouchableOpacity>
@@ -317,12 +367,16 @@ export default function CampoDetailScreen({ route, navigation }) {
             );
           })
         ) : (
-          <Text style={styles.noTurmaText}>Nenhuma turma neste dia</Text>
+          <Text style={styles.noTurmaText}>Nenhum item neste dia</Text>
         )}
       </View>
     </ScrollView>
   );
 }
+
+// Estilos permanecem iguais (omitidos por brevidade, use os mesmos do código anterior)
+
+// Estilos permanecem iguais (omitidos por brevidade)
 
 const styles = StyleSheet.create({
   container: {

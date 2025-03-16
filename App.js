@@ -3,17 +3,17 @@ import React, { useState } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createDrawerNavigator } from "@react-navigation/drawer";
 import { createStackNavigator } from "@react-navigation/stack";
-import { View, Text, TouchableOpacity } from "react-native";
 import { DrawerContentScrollView, DrawerItem } from "@react-navigation/drawer";
 import HomeScreen from "./src/screens/HomeScreen";
 import CampoDetailScreen from "./src/screens/CampoDetailScreen";
-import AddCampoScreen from "./src/screens/AddCampoScreen"; // Verifique se existe
+import AddCampoScreen from "./src/screens/AddCampoScreen";
 import AddTurmaScreen from "./src/screens/AddTurmaScreen";
 
 const Drawer = createDrawerNavigator();
 const Stack = createStackNavigator();
 
 function HomeStack({ navigation, route, mode }) {
+  // Mode passado diretamente como prop
   return (
     <Stack.Navigator>
       <Stack.Screen name="Home" options={{ headerShown: false }}>
@@ -24,7 +24,7 @@ function HomeStack({ navigation, route, mode }) {
       </Stack.Screen>
       <Stack.Screen
         name="AddCampo"
-        component={AddCampoScreen} // Se não existe, podemos remover ou criar depois
+        component={AddCampoScreen}
         options={{ title: "Adicionar Campo" }}
       />
       <Stack.Screen
@@ -48,7 +48,7 @@ function PlaceholderScreen({ navigation }) {
 }
 
 function CustomDrawerContent(props) {
-  const { navigation, setMode } = props;
+  const { navigation, setMode, mode } = props;
 
   const handleAddCampo = () => {
     console.log("Drawer: Solicitando abertura do modal de adicionar campo");
@@ -95,16 +95,36 @@ function CustomDrawerContent(props) {
       <DrawerItem
         label="Turmas"
         onPress={() => {
+          console.log("Drawer: Clique em Turmas - Antes de setMode");
           setMode("turmas");
-          navigation.navigate("HomeStack", { screen: "Home" });
+          console.log(
+            "Drawer: Clique em Turmas - Após setMode, modo definido como turmas"
+          );
+          navigation.navigate("HomeStack", {
+            screen: "Home",
+            params: { mode: "turmas" },
+          });
+          console.log("Drawer: Clique em Turmas - Após navigate");
+          navigation.closeDrawer();
+          console.log("Drawer: Clique em Turmas - Drawer fechado");
         }}
         labelStyle={{ color: "#fff", fontSize: 18 }}
       />
       <DrawerItem
         label="Escolinha"
         onPress={() => {
+          console.log("Drawer: Clique em Escolinha - Antes de setMode");
           setMode("escolinha");
-          navigation.navigate("HomeStack", { screen: "Home" });
+          console.log(
+            "Drawer: Clique em Escolinha - Após setMode, modo definido como escolinha"
+          );
+          navigation.navigate("HomeStack", {
+            screen: "Home",
+            params: { mode: "escolinha" },
+          });
+          console.log("Drawer: Clique em Escolinha - Após navigate");
+          navigation.closeDrawer();
+          console.log("Drawer: Clique em Escolinha - Drawer fechado");
         }}
         labelStyle={{ color: "#fff", fontSize: 18 }}
       />
@@ -142,11 +162,11 @@ export default function App() {
         screenOptions={{
           headerShown: false,
           drawerStyle: {
-            backgroundColor: "#04394e", // Mesma cor do HomeScreen
+            backgroundColor: "#04394e",
           },
         }}
         drawerContent={(props) => (
-          <CustomDrawerContent {...props} setMode={setMode} />
+          <CustomDrawerContent {...props} setMode={setMode} mode={mode} />
         )}
       >
         <Drawer.Screen name="HomeStack">
