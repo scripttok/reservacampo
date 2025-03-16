@@ -1,48 +1,51 @@
 // src/services/escolinhaService.js
-let escolinhaData = [
-  {
-    id: "escolinha1",
-    campoId: "SIfI1DMe9hHuZEnTWSd3",
-    nome: "Aula Sub-10",
-    responsavel: "Professor Pedro",
-    telefone: "987654321",
-    dia: "segunda",
-    inicio: "16:00",
-    fim: "17:00",
-    createdAt: "2025-01-01T00:00:00.000Z",
-  },
-];
+import { db } from "./firebaseService";
+import {
+  collection,
+  getDocs,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
+} from "firebase/firestore";
+
+const ESCOLINHA_COLLECTION = "escolinha";
 
 export const escolinhaService = {
-  getAulas: async () => {
+  async getAulas() {
     console.log("escolinhaService: Buscando aulas");
-    return escolinhaData;
+    const aulasCol = collection(db, ESCOLINHA_COLLECTION);
+    const aulasSnapshot = await getDocs(aulasCol);
+    const aulasList = aulasSnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+    console.log("escolinhaService: Aulas encontradas:", aulasList.length);
+    return aulasList;
   },
-  addAula: async (aula) => {
-    const novaAula = {
-      ...aula,
-      id: `escolinha${escolinhaData.length + 1}`,
-      createdAt: new Date().toISOString(),
-    };
-    escolinhaData.push(novaAula);
-    console.log("escolinhaService: Aula adicionada:", novaAula);
+
+  async addAula(aula) {
+    console.log("escolinhaService: Adicionando aula:", aula);
+    const createdAt = new Date().toISOString(); // Data atual em formato ISO
+    const aulaComData = { ...aula, createdAt };
+    const aulasCol = collection(db, ESCOLINHA_COLLECTION);
+    const docRef = await addDoc(aulasCol, aulaComData);
+    const novaAula = { id: docRef.id, ...aulaComData };
+    console.log("escolinhaService: Aula adicionada com ID:", docRef.id);
+    return novaAula;
   },
-  updateAula: async (id, aulaAtualizada) => {
-    const index = escolinhaData.findIndex((aula) => aula.id === id);
-    if (index !== -1) {
-      escolinhaData[index] = { ...escolinhaData[index], ...aulaAtualizada };
-      console.log("escolinhaService: Aula atualizada:", escolinhaData[index]);
-    } else {
-      throw new Error("Aula não encontrada");
-    }
+
+  async updateAula(id, aulaAtualizada) {
+    console.log("escolinhaService: Atualizando aula:", id, aulaAtualizada);
+    const aulaRef = doc(db, ESCOLINHA_COLLECTION, id);
+    await updateDoc(aulaRef, aulaAtualizada);
+    console.log("escolinhaService: Aula atualizada");
   },
-  deleteAula: async (id) => {
-    const index = escolinhaData.findIndex((aula) => aula.id === id);
-    if (index !== -1) {
-      escolinhaData.splice(index, 1);
-      console.log("escolinhaService: Aula deletada:", id);
-    } else {
-      throw new Error("Aula não encontrada");
-    }
+
+  async deleteAula(id) {
+    console.log("escolinhaService: Deletando aula:", id);
+    const aulaRef = doc(db, ESCOLINHA_COLLECTION, id);
+    await deleteDoc(aulaRef);
+    console.log("escolinhaService: Aula deletada");
   },
 };

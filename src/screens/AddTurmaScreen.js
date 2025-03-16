@@ -48,18 +48,22 @@ export default function AddTurmaScreen({ route, navigation }) {
       return;
     }
 
-    const novaTurmaOuAula = {
-      campoId,
-      nome,
-      responsavel,
-      telefone,
-      dia: turmaDia.toLowerCase(),
-      inicio: turmaInicio,
-      fim: turmaFim,
-      createdAt: turma?.createdAt || new Date().toISOString(),
-    };
+    const novaTurmaOuAula = Object.assign(
+      {},
+      {
+        campoId: campoId,
+        nome: nome,
+        responsavel: responsavel,
+        telefone: telefone,
+        dia: turmaDia.toLowerCase(),
+        inicio: turmaInicio,
+        fim: turmaFim,
+        createdAt: turma?.createdAt || new Date().toISOString(),
+      }
+    );
 
     console.log("AddTurmaScreen: Tentando salvar:", novaTurmaOuAula);
+    console.log("AddTurmaScreen: Modo selecionado (tipo):", tipo);
 
     // Buscar turmas e aulas existentes
     const turmasExistentes = await turmaService.getTurmas();
@@ -86,7 +90,7 @@ export default function AddTurmaScreen({ route, navigation }) {
 
     // Verificar conflitos apenas no mesmo dia
     const conflito = todosHorarios.some((item) => {
-      if (turma && item.id === turma.id) return false; // Ignorar a própria turma/aula ao editar
+      if (turma && item.id === turma.id) return false;
       const conflitoDetectado = checkHorarioConflito(item, novaTurmaOuAula);
       if (conflitoDetectado) {
         console.log("Conflito encontrado com:", item);
@@ -104,26 +108,31 @@ export default function AddTurmaScreen({ route, navigation }) {
 
     try {
       if (tipo === "turmas") {
+        console.log("AddTurmaScreen: Salvando como turma");
         if (turma?.id) {
           await turmaService.updateTurma(turma.id, novaTurmaOuAula);
-          console.log("Turma atualizada com sucesso");
+          console.log("AddTurmaScreen: Turma atualizada com sucesso");
         } else {
           await turmaService.addTurma(novaTurmaOuAula);
-          console.log("Turma adicionada com sucesso");
+          console.log("AddTurmaScreen: Turma adicionada com sucesso");
         }
       } else {
+        console.log("AddTurmaScreen: Salvando como aula (escolinha)");
         if (turma?.id) {
           await escolinhaService.updateAula(turma.id, novaTurmaOuAula);
-          console.log("Aula atualizada com sucesso");
+          console.log("AddTurmaScreen: Aula atualizada com sucesso");
         } else {
-          await escolinhaService.addAula(novaTurmaOuAula);
-          console.log("Aula adicionada com sucesso");
+          const novaAula = await escolinhaService.addAula(novaTurmaOuAula);
+          console.log("AddTurmaScreen: Aula adicionada com sucesso:", novaAula);
         }
       }
+      console.log("AddTurmaScreen: Navegando de volta após salvar");
       navigation.goBack();
     } catch (error) {
       console.error(
-        `Erro ao salvar ${tipo === "turmas" ? "turma" : "aula"}:`,
+        `AddTurmaScreen: Erro ao salvar ${
+          tipo === "turmas" ? "turma" : "aula"
+        }:`,
         error
       );
       Alert.alert(
