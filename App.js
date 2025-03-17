@@ -13,7 +13,6 @@ const Drawer = createDrawerNavigator();
 const Stack = createStackNavigator();
 
 function HomeStack({ navigation, route, mode }) {
-  // Mode passado diretamente como prop
   return (
     <Stack.Navigator>
       <Stack.Screen name="Home" options={{ headerShown: false }}>
@@ -51,23 +50,17 @@ function CustomDrawerContent(props) {
   const { navigation, setMode, mode } = props;
 
   const handleAddCampo = () => {
-    console.log("Drawer: Solicitando abertura do modal de adicionar campo");
-    const homeParams = navigation
-      .getState()
-      .routes.find((r) => r.name === "HomeStack")?.state?.routes[0]?.params;
-    if (homeParams?.openAddModal) {
-      homeParams.openAddModal();
-      navigation.closeDrawer();
-    } else {
-      console.error(
-        "Drawer: openAddModal não encontrado nos parâmetros da Home!"
-      );
-      navigation.navigate("HomeStack", {
-        screen: "Home",
-        params: { openAddModal: true },
-      });
-      navigation.closeDrawer();
-    }
+    console.log("Drawer: Navegando para AddCampoScreen");
+    navigation.navigate("HomeStack", {
+      screen: "AddCampo",
+      params: {
+        refreshCampos: async () => {
+          console.log("Drawer: Atualizando lista de campos no HomeScreen");
+          navigation.navigate("HomeStack", { screen: "Home" });
+        },
+      },
+    });
+    navigation.closeDrawer();
   };
 
   const handleConfigHorarios = () => {
@@ -177,10 +170,6 @@ export default function App() {
           component={PlaceholderScreen}
         />
         <Drawer.Screen name="Relatorios" component={PlaceholderScreen} />
-        <Drawer.Screen
-          name="ConfigurarHorarios"
-          component={PlaceholderScreen}
-        />
       </Drawer.Navigator>
     </NavigationContainer>
   );

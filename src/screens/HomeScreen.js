@@ -8,26 +8,23 @@ import {
   TouchableOpacity,
   Modal,
   TextInput,
-  FlatList,
 } from "react-native";
 import { campoService } from "../services/campoService";
 import { turmaService } from "../services/turmaService";
-import { escolinhaService } from "../services/escolinhaService";
+import { escolinhaService } from "../services/escolinhaService"; // Adicionado
 import { configService } from "../services/configService";
-import { checkHorarioConflito } from "../utils/horarioUtils";
 import Campo from "../components/Campo";
 import { DrawerActions } from "@react-navigation/native";
 
-export default function HomeScreen({ navigation, route, mode }) {
+export default function HomeScreen({ navigation, route }) {
+  const { mode = "turmas", openAddModal, openConfigModal } = route.params || {};
   const [campos, setCampos] = useState([]);
   const [turmasOuAulas, setTurmasOuAulas] = useState([]);
-  const [todosHorarios, setTodosHorarios] = useState([]);
-  const [conflitos, setConflitos] = useState([]); // Novo estado para conflitos
   const [loading, setLoading] = useState(true);
-  const [modalVisible, setModalVisible] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false); // Modal de exclusão
   const [campoParaExcluir, setCampoParaExcluir] = useState(null);
-  const [addModalVisible, setAddModalVisible] = useState(false);
-  const [configModalVisible, setConfigModalVisible] = useState(false);
+  const [addModalVisible, setAddModalVisible] = useState(false); // Modal de adicionar campo
+  const [configModalVisible, setConfigModalVisible] = useState(false); // Modal de configurar horários
   const [novoCampoNome, setNovoCampoNome] = useState("");
   const [horarioInicio, setHorarioInicio] = useState("09:00");
   const [horarioFim, setHorarioFim] = useState("23:00");
@@ -37,6 +34,7 @@ export default function HomeScreen({ navigation, route, mode }) {
       try {
         console.log("HomeScreen: Buscando dados, modo atual:", mode);
         const camposData = await campoService.getCampos();
+        const horario = await configService.getHorarioFuncionamento();
         let turmasOuAulasData = [];
         if (mode === "turmas") {
           turmasOuAulasData = await turmaService.getTurmas();
@@ -51,55 +49,38 @@ export default function HomeScreen({ navigation, route, mode }) {
             turmasOuAulasData.length
           );
         }
-
         setCampos(camposData);
         setTurmasOuAulas(turmasOuAulasData);
-
-        const conflitos = turmasOuAulasData.filter((item, index, self) =>
-          self.some(
-            (other, otherIndex) =>
-              index !== otherIndex &&
-              item.dia === other.dia &&
-              item.campoId === other.campoId &&
-              checkHorarioConflito(item, other)
-          )
-        );
-        if (conflitos.length > 0) {
-          console.log(
-            "HomeScreen: Conflitos de horário encontrados:",
-            conflitos
-          );
-        } else {
-          console.log("HomeScreen: Nenhum conflito de horário encontrado.");
-        }
+        setHorarioInicio(horario.inicio);
+        setHorarioFim(horario.fim);
       } catch (error) {
         console.error("HomeScreen: Erro ao carregar dados:", error);
       } finally {
         setLoading(false);
       }
     };
-
     fetchData();
-    const unsubscribe = navigation.addListener("focus", fetchData);
-    return () => unsubscribe();
+
+    // Definir funções nos parâmetros de navegação
+    navigation.setParams({
+      openAddModal: () => {
+        console.log("HomeScreen: Abrindo modal de adicionar campo");
+        setAddModalVisible(true);
+      },
+      openConfigModal: () => {
+        console.log("HomeScreen: Abrindo modal de configurar horários");
+        setConfigModalVisible(true);
+      },
+    });
+
+    // Abrir modais com base nos parâmetros iniciais
+    if (openAddModal) {
+      setAddModalVisible(true);
+    }
+    if (openConfigModal) {
+      setConfigModalVisible(true);
+    }
   }, [navigation, mode]);
-
-  const isEmAtraso = (createdAt) => {
-    if (!createdAt) return false;
-    const dataCriacao = new Date(createdAt);
-    const proximoPagamento = new Date(dataCriacao);
-    proximoPagamento.setDate(dataCriacao.getDate() + 30);
-    const hoje = new Date();
-    return hoje > proximoPagamento;
-  };
-
-  const emAtraso = turmasOuAulas.filter((item) => isEmAtraso(item.createdAt));
-
-  const handleLongPressCampo = (campo) => {
-    console.log("HomeScreen: Long press no campo:", campo);
-    setCampoParaExcluir(campo);
-    setModalVisible(true);
-  };
 
   const handleCampoPress = (campo) => {
     console.log("HomeScreen: Clicou no campo:", campo, "Modo:", mode);
@@ -110,29 +91,10 @@ export default function HomeScreen({ navigation, route, mode }) {
     navigation.navigate("CampoDetail", { campo, turmas: turmasOuAulas, mode });
   };
 
-  // src/screens/HomeScreen.js (apenas a parte relevante)
-  const handleAtrasadaPress = (item) => {
-    const campo = campos.find((c) => c.id === item.campoId);
-    if (campo) {
-      console.log(
-        `HomeScreen: Navegando para campo ${
-          mode === "turmas" ? "da turma" : "da aula"
-        } em atraso:`,
-        campo.nome,
-        "Dia:",
-        item.dia,
-        "ID:",
-        item.id
-      );
-      navigation.navigate("CampoDetail", {
-        campo,
-        turmas: turmasOuAulas,
-        diaSelecionado: item.dia.toLowerCase(), // Já está correto, mas vamos confirmar
-        itemId: item.id, // Passa o ID da turma/aula clicada
-      });
-    } else {
-      console.error("HomeScreen: Campo não encontrado para o item:", item);
-    }
+  const handleLongPressCampo = (campo) => {
+    console.log("HomeScreen: Long press no campo:", campo);
+    setCampoParaExcluir(campo);
+    setModalVisible(true);
   };
 
   const confirmDeleteCampo = async () => {
@@ -143,7 +105,7 @@ export default function HomeScreen({ navigation, route, mode }) {
         setModalVisible(false);
         setCampoParaExcluir(null);
       } catch (error) {
-        console.error("Erro ao deletar campo:", error);
+        console.error("HomeScreen: Erro ao deletar campo:", error);
         alert("Erro ao deletar o campo.");
       }
     }
@@ -163,7 +125,7 @@ export default function HomeScreen({ navigation, route, mode }) {
         setAddModalVisible(false);
         setNovoCampoNome("");
       } catch (error) {
-        console.error("Erro ao adicionar campo:", error);
+        console.error("HomeScreen: Erro ao adicionar campo:", error);
         alert("Erro ao adicionar o campo.");
       }
     }
@@ -174,7 +136,10 @@ export default function HomeScreen({ navigation, route, mode }) {
       await configService.setHorarioFuncionamento(horarioInicio, horarioFim);
       setConfigModalVisible(false);
     } catch (error) {
-      console.error("Erro ao salvar horário de funcionamento:", error);
+      console.error(
+        "HomeScreen: Erro ao salvar horário de funcionamento:",
+        error
+      );
       alert("Erro ao salvar o horário.");
     }
   };
@@ -183,31 +148,10 @@ export default function HomeScreen({ navigation, route, mode }) {
     navigation.dispatch(DrawerActions.openDrawer());
   };
 
-  const renderAtrasoCard = ({ item }) => (
-    <TouchableOpacity
-      style={styles.atrasoCard}
-      onPress={() => handleAtrasadaPress(item)}
-    >
-      <Text style={styles.atrasoText}>{item.responsavel}</Text>
-    </TouchableOpacity>
-  );
-
-  const renderConflitoCard = ({ item }) => (
-    <View style={styles.conflitoCard}>
-      <Text style={styles.conflitoText}>
-        Conflito: {item.turma} vs {item.aula}
-      </Text>
-      <Text style={styles.conflitoText}>
-        {item.dia} - {item.horario} (Campo:{" "}
-        {campos.find((c) => c.id === item.campoId)?.nome || item.campoId})
-      </Text>
-    </View>
-  );
-
   if (loading) {
     return (
       <View style={styles.container}>
-        <Text style={{ color: "#fff" }}>Carregando...</Text>
+        <Text>Carregando...</Text>
       </View>
     );
   }
@@ -222,38 +166,7 @@ export default function HomeScreen({ navigation, route, mode }) {
           {mode === "turmas" ? "Turmas" : "Escolinha"}
         </Text>
       </View>
-
-      {conflitos.length > 0 && (
-        <View style={styles.conflitoContainer}>
-          <Text style={styles.conflitoTitle}>Conflitos de Horário</Text>
-          <FlatList
-            data={conflitos}
-            renderItem={renderConflitoCard}
-            keyExtractor={(item, index) => `conflito-${index}`}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.conflitoList}
-          />
-        </View>
-      )}
-
-      {emAtraso.length > 0 && (
-        <View style={styles.atrasoContainer}>
-          <Text style={styles.atrasoTitle}>
-            {mode === "turmas" ? "Turmas em Atraso" : "Aulas em Atraso"}
-          </Text>
-          <FlatList
-            data={emAtraso}
-            renderItem={renderAtrasoCard}
-            keyExtractor={(item) => item.id}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.atrasoList}
-          />
-        </View>
-      )}
-
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView>
         {campos.map((campo) => (
           <View key={campo.id} style={styles.campoContainer}>
             <Campo
@@ -266,6 +179,7 @@ export default function HomeScreen({ navigation, route, mode }) {
         ))}
       </ScrollView>
 
+      {/* Modal de Exclusão */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -296,6 +210,7 @@ export default function HomeScreen({ navigation, route, mode }) {
         </View>
       </Modal>
 
+      {/* Modal de Adicionar Campo */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -329,6 +244,7 @@ export default function HomeScreen({ navigation, route, mode }) {
         </View>
       </Modal>
 
+      {/* Modal de Configurar Horários */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -374,87 +290,27 @@ export default function HomeScreen({ navigation, route, mode }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#04394e",
+    backgroundColor: "#1f2f3a",
     padding: 10,
   },
   header: {
     flexDirection: "row",
-    justifyContent: "flex-start",
+    justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 1,
+    marginBottom: 15,
   },
   hamburger: {
-    marginTop: 50,
     fontSize: 30,
-    color: "#fff",
+    color: "#007AFF",
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: "bold",
-    color: "#fff",
-    marginLeft: 20,
-  },
-  conflitoContainer: {
-    marginBottom: 5,
-    padding: 1,
-    backgroundColor: "transparent",
-    borderRadius: 5,
-  },
-  conflitoTitle: {
-    fontSize: 10,
-    fontWeight: "bold",
-    color: "#fff",
-    marginBottom: 10,
-  },
-  conflitoList: {
-    flexGrow: 0,
-  },
-  conflitoCard: {
-    backgroundColor: "#ffcc00", // Amarelo para destacar conflitos
-    padding: 5,
-    borderRadius: 5,
-    marginRight: 10,
-    minWidth: 150,
-  },
-  conflitoText: {
-    color: "#000",
-    fontSize: 12,
-    fontWeight: "bold",
-    textAlign: "center",
-  },
-  atrasoContainer: {
-    marginBottom: 5,
-    padding: 1,
-    backgroundColor: "transparent",
-    borderRadius: 5,
-  },
-  atrasoTitle: {
-    fontSize: 10,
-    fontWeight: "bold",
-    color: "#fff",
-    marginBottom: 10,
-  },
-  atrasoList: {
-    flexGrow: 0,
-  },
-  atrasoCard: {
-    backgroundColor: "#fa023c",
-    padding: 5,
-    borderRadius: 5,
-    marginRight: 10,
-    minWidth: 50,
-    alignItems: "center",
-  },
-  atrasoText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "bold",
-    textAlign: "center",
-  },
-  scrollContent: {
-    alignItems: "center",
+    color: "red",
   },
   campoContainer: {
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 10,
   },
   modalOverlay: {
