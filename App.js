@@ -8,6 +8,7 @@ import HomeScreen from "./src/screens/HomeScreen";
 import CampoDetailScreen from "./src/screens/CampoDetailScreen";
 import AddCampoScreen from "./src/screens/AddCampoScreen";
 import AddTurmaScreen from "./src/screens/AddTurmaScreen";
+import AlunosScreen from "./src/screens/AlunosScreen";
 
 const Drawer = createDrawerNavigator();
 const Stack = createStackNavigator();
@@ -51,7 +52,6 @@ function CustomDrawerContent(props) {
 
   const handleAddCampo = () => {
     console.log("Drawer: Solicitando abertura do modal de adicionar campo");
-    // Verifica se o HomeScreen já está na pilha e tenta chamar openAddModal
     const homeParams = navigation
       .getState()
       .routes.find((r) => r.name === "HomeStack")?.state?.routes[0]?.params;
@@ -59,7 +59,6 @@ function CustomDrawerContent(props) {
       homeParams.openAddModal();
       navigation.closeDrawer();
     } else {
-      // Se não estiver disponível, navega para Home com o parâmetro para abrir o modal
       console.log("Drawer: Navegando para Home com modal de adicionar campo");
       navigation.navigate("HomeStack", {
         screen: "Home",
@@ -94,42 +93,35 @@ function CustomDrawerContent(props) {
       <DrawerItem
         label="Turmas"
         onPress={() => {
-          console.log("Drawer: Clique em Turmas - Antes de setMode");
           setMode("turmas");
-          console.log(
-            "Drawer: Clique em Turmas - Após setMode, modo definido como turmas"
-          );
           navigation.navigate("HomeStack", {
             screen: "Home",
             params: { mode: "turmas" },
           });
-          console.log("Drawer: Clique em Turmas - Após navigate");
           navigation.closeDrawer();
-          console.log("Drawer: Clique em Turmas - Drawer fechado");
         }}
         labelStyle={{ color: "#fff", fontSize: 18 }}
       />
       <DrawerItem
         label="Escolinha"
         onPress={() => {
-          console.log("Drawer: Clique em Escolinha - Antes de setMode");
           setMode("escolinha");
-          console.log(
-            "Drawer: Clique em Escolinha - Após setMode, modo definido como escolinha"
-          );
           navigation.navigate("HomeStack", {
             screen: "Home",
             params: { mode: "escolinha" },
           });
-          console.log("Drawer: Clique em Escolinha - Após navigate");
           navigation.closeDrawer();
-          console.log("Drawer: Clique em Escolinha - Drawer fechado");
         }}
         labelStyle={{ color: "#fff", fontSize: 18 }}
       />
       <DrawerItem
         label="Adicionar Campo"
         onPress={handleAddCampo}
+        labelStyle={{ color: "#fff", fontSize: 18 }}
+      />
+      <DrawerItem
+        label="Alunos" // Novo botão adicionado aqui
+        onPress={() => navigation.navigate("Alunos")}
         labelStyle={{ color: "#fff", fontSize: 18 }}
       />
       <DrawerItem
@@ -176,6 +168,7 @@ export default function App() {
           component={PlaceholderScreen}
         />
         <Drawer.Screen name="Relatorios" component={PlaceholderScreen} />
+        <Drawer.Screen name="Alunos" component={AlunosScreen} />
       </Drawer.Navigator>
     </NavigationContainer>
   );
