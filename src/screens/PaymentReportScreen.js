@@ -112,6 +112,7 @@ export default function PaymentReportScreen({ navigation }) {
           </Text>
         </View>
       );
+      // Em PaymentReportScreen.js, dentro de renderItem
     } else if (item.type === "aluno") {
       return (
         <View style={styles.itemCard}>
