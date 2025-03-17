@@ -4,12 +4,14 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createDrawerNavigator } from "@react-navigation/drawer";
 import { createStackNavigator } from "@react-navigation/stack";
 import { DrawerContentScrollView, DrawerItem } from "@react-navigation/drawer";
+import { View, Text } from "react-native"; // Import necessário para PlaceholderScreen
 import HomeScreen from "./src/screens/HomeScreen";
 import CampoDetailScreen from "./src/screens/CampoDetailScreen";
 import AddCampoScreen from "./src/screens/AddCampoScreen";
 import AddTurmaScreen from "./src/screens/AddTurmaScreen";
 import AlunosScreen from "./src/screens/AlunosScreen";
 import PriceTableScreen from "./src/screens/PriceTableScreen";
+import PaymentReportScreen from "./src/screens/PaymentReportScreen"; // Nova tela
 
 const Drawer = createDrawerNavigator();
 const Stack = createStackNavigator();
@@ -127,7 +129,7 @@ function CustomDrawerContent(props) {
       />
       <DrawerItem
         label="Registrar Pagamento"
-        onPress={() => navigation.navigate("RegistrarPagamento")}
+        onPress={() => navigation.navigate("PaymentReport")}
         labelStyle={{ color: "#fff", fontSize: 18 }}
       />
       <DrawerItem
@@ -172,10 +174,8 @@ export default function App() {
         <Drawer.Screen name="HomeStack">
           {(props) => <HomeStack {...props} mode={mode} />}
         </Drawer.Screen>
-        <Drawer.Screen
-          name="RegistrarPagamento"
-          component={PlaceholderScreen}
-        />
+        <Drawer.Screen name="PaymentReport" component={PaymentReportScreen} />
+
         <Drawer.Screen name="Relatorios" component={PlaceholderScreen} />
         <Drawer.Screen name="Alunos" component={AlunosScreen} />
         <Drawer.Screen name="PriceTable" component={PriceTableScreen} />
