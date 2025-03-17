@@ -38,7 +38,7 @@ export const alunoService = {
   },
   async updateAluno(
     id,
-    { nome, responsavel, telefoneResponsavel, idade, turma }
+    { nome, responsavel, telefoneResponsavel, idade, turma, createdAt }
   ) {
     console.log("alunoService: Atualizando aluno:", id);
     const alunoRef = doc(db, ALUNOS_COLLECTION, id);
@@ -48,6 +48,7 @@ export const alunoService = {
       telefoneResponsavel,
       idade,
       turma,
+      createdAt,
     });
     console.log("alunoService: Aluno atualizado:", id);
   },
