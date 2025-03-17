@@ -10,10 +10,11 @@ import {
   TextInput,
   Alert,
 } from "react-native";
-import { alunoService } from "../services/alunoService"; // Vamos criar esse serviço depois
+import { alunoService } from "../services/alunoService";
 
 export default function AlunosScreen({ navigation }) {
   const [alunos, setAlunos] = useState([]);
+  const [alunosFiltrados, setAlunosFiltrados] = useState([]); // Nova lista filtrada
   const [modalVisible, setModalVisible] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [alunoSelecionado, setAlunoSelecionado] = useState(null);
@@ -22,6 +23,7 @@ export default function AlunosScreen({ navigation }) {
   const [telefoneResponsavel, setTelefoneResponsavel] = useState("");
   const [idade, setIdade] = useState("");
   const [turma, setTurma] = useState("");
+  const [termoBusca, setTermoBusca] = useState(""); // Estado para o texto de busca
 
   // Carregar lista de alunos ao montar a tela
   useEffect(() => {
@@ -29,6 +31,7 @@ export default function AlunosScreen({ navigation }) {
       try {
         const alunosData = await alunoService.getAlunos();
         setAlunos(alunosData);
+        setAlunosFiltrados(alunosData); // Inicializa a lista filtrada com todos os alunos
       } catch (error) {
         console.error("Erro ao carregar alunos:", error);
         Alert.alert("Erro", "Não foi possível carregar a lista de alunos.");
@@ -36,6 +39,18 @@ export default function AlunosScreen({ navigation }) {
     };
     fetchAlunos();
   }, []);
+
+  // Filtrar alunos com base no termo de busca
+  useEffect(() => {
+    if (termoBusca.trim() === "") {
+      setAlunosFiltrados(alunos); // Mostra todos os alunos se o campo estiver vazio
+    } else {
+      const filtrados = alunos.filter((aluno) =>
+        aluno.nome.toLowerCase().includes(termoBusca.toLowerCase())
+      );
+      setAlunosFiltrados(filtrados);
+    }
+  }, [termoBusca, alunos]);
 
   // Abrir modal para adicionar aluno
   const handleAddAluno = () => {
@@ -82,6 +97,7 @@ export default function AlunosScreen({ navigation }) {
       }
       const alunosData = await alunoService.getAlunos();
       setAlunos(alunosData);
+      setAlunosFiltrados(alunosData); // Atualiza a lista filtrada também
       setModalVisible(false);
     } catch (error) {
       console.error("Erro ao salvar aluno:", error);
@@ -110,7 +126,9 @@ export default function AlunosScreen({ navigation }) {
         onPress: async () => {
           try {
             await alunoService.deleteAluno(id);
-            setAlunos(alunos.filter((aluno) => aluno.id !== id));
+            const alunosData = await alunoService.getAlunos();
+            setAlunos(alunosData);
+            setAlunosFiltrados(alunosData); // Atualiza a lista filtrada
           } catch (error) {
             console.error("Erro ao excluir aluno:", error);
             Alert.alert("Erro", "Não foi possível excluir o aluno.");
@@ -143,12 +161,18 @@ export default function AlunosScreen({ navigation }) {
       <TouchableOpacity style={styles.addButton} onPress={handleAddAluno}>
         <Text style={styles.addButtonText}>Adicionar Aluno</Text>
       </TouchableOpacity>
+      <TextInput
+        style={styles.searchInput}
+        placeholder="Buscar por nome..."
+        value={termoBusca}
+        onChangeText={setTermoBusca}
+      />
       <FlatList
-        data={alunos}
+        data={alunosFiltrados} // Usa a lista filtrada
         renderItem={renderAluno}
         keyExtractor={(item) => item.id}
         ListEmptyComponent={
-          <Text style={styles.emptyText}>Nenhum aluno cadastrado.</Text>
+          <Text style={styles.emptyText}>Nenhum aluno encontrado.</Text>
         }
       />
 
@@ -226,8 +250,17 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: "bold",
-    marginBottom: 20,
+    marginBottom: 10, // Ajustado para dar espaço ao input de busca
     textAlign: "center",
+  },
+  searchInput: {
+    width: "100%",
+    padding: 10,
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 5,
+    marginBottom: 20,
+    backgroundColor: "#fff",
   },
   addButton: {
     backgroundColor: "#007AFF",
