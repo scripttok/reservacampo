@@ -85,6 +85,7 @@ export default function AlunosScreen({ navigation }) {
           telefoneResponsavel,
           idade: parseInt(idade),
           turma,
+          createdAt: alunoSelecionado.createdAt, // Preserva o createdAt original
         });
       } else {
         await alunoService.addAluno({
@@ -93,6 +94,7 @@ export default function AlunosScreen({ navigation }) {
           telefoneResponsavel,
           idade: parseInt(idade),
           turma,
+          // createdAt será adicionado automaticamente no alunoService
         });
       }
       const alunosData = await alunoService.getAlunos();
@@ -171,6 +173,13 @@ export default function AlunosScreen({ navigation }) {
       <Text>Responsável: {item.responsavel}</Text>
       <Text>Telefone: {item.telefoneResponsavel}</Text>
       <Text>Idade: {item.idade}</Text>
+      {/* Opcional: exibir createdAt na lista de alunos */}
+      <Text>
+        Data de Cadastro:{" "}
+        {item.createdAt
+          ? new Date(item.createdAt).toLocaleDateString("pt-BR")
+          : "Não informado"}
+      </Text>
     </TouchableOpacity>
   );
 
@@ -182,7 +191,7 @@ export default function AlunosScreen({ navigation }) {
           data={professores}
           renderItem={renderProfessor}
           keyExtractor={(item) => item}
-          numColumns={3} // 3 botões por linha
+          numColumns={3}
           showsVerticalScrollIndicator={false}
           style={styles.professorList}
           ListEmptyComponent={
@@ -303,21 +312,21 @@ const styles = StyleSheet.create({
     marginBottom: 1,
   },
   professorItem: {
-    paddingVertical: 6, // Compacto na vertical
+    paddingVertical: 6,
     paddingHorizontal: 12,
-    margin: 5, // Espaçamento entre botões
+    margin: 5,
     backgroundColor: "#ddd",
     borderRadius: 5,
-    flex: 1, // Divide o espaço igualmente entre os 3 itens
-    alignItems: "center", // Centraliza o texto horizontalmente
-    justifyContent: "center", // Centraliza o texto verticalmente
-    maxWidth: "30%", // Limita a largura para caber 3 por linha
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    maxWidth: "30%",
   },
   professorItemSelected: {
     backgroundColor: "#007AFF",
   },
   professorText: {
-    fontSize: 14, // Tamanho de fonte menor
+    fontSize: 14,
     color: "#333",
     textAlign: "center",
   },

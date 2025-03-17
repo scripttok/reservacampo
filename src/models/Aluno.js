@@ -1,12 +1,21 @@
 // src/models/Aluno.js
 export class Aluno {
-  constructor(id, nome, responsavel, telefoneResponsavel, idade, turma) {
+  constructor(
+    id,
+    nome,
+    responsavel,
+    telefoneResponsavel,
+    idade,
+    turma,
+    createdAt
+  ) {
     this.id = id;
     this.nome = nome;
     this.responsavel = responsavel;
     this.telefoneResponsavel = telefoneResponsavel;
     this.idade = idade;
     this.turma = turma;
+    this.createdAt = createdAt;
   }
 
   static fromFirestore(doc) {
@@ -17,7 +26,8 @@ export class Aluno {
       data.responsavel,
       data.telefoneResponsavel,
       data.idade,
-      data.turma
+      data.turma,
+      data.createdAt
     );
   }
 
@@ -28,6 +38,7 @@ export class Aluno {
       telefoneResponsavel: this.telefoneResponsavel,
       idade: this.idade,
       turma: this.turma,
+      createdAt: this.createdAt,
     };
   }
 }
