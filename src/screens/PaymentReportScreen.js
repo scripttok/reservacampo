@@ -5,7 +5,7 @@ import {
   View,
   Text,
   TouchableOpacity,
-  FlatList,
+  SectionList,
   Modal,
   TextInput,
 } from "react-native";
@@ -91,7 +91,7 @@ export default function PaymentReportScreen({ navigation }) {
   };
 
   const renderItem = ({ item }) => {
-    console.log("Renderizando item:", item); // Log para verificar cada item
+    console.log("Renderizando item:", item);
     if (item.type === "turma") {
       return (
         <View style={styles.itemCard}>
@@ -138,16 +138,11 @@ export default function PaymentReportScreen({ navigation }) {
     return <Text style={styles.itemText}>Item inválido</Text>;
   };
 
-  const renderSectionHeader = ({ section }) => (
+  const renderSectionHeader = ({ section: { title, data } }) => (
     <Text style={styles.sectionTitle}>
-      {section.title} ({section.data.length})
+      {title} ({data.length})
     </Text>
   );
-
-  // Função para extrair todos os itens de todas as seções
-  const extractData = (sections) => {
-    return sections.reduce((acc, section) => acc.concat(section.data), []);
-  };
 
   return (
     <View style={styles.container}>
@@ -161,24 +156,19 @@ export default function PaymentReportScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
-      <FlatList
-        data={extractData(sections)} // Extrai todos os itens das seções
+      <SectionList
+        sections={sections} // Usamos sections em vez de data
         renderItem={renderItem}
         keyExtractor={(item, index) => `${item.id}-${index}`}
+        renderSectionHeader={renderSectionHeader}
         ListEmptyComponent={
           <Text style={styles.emptyText}>Nenhum dado cadastrado</Text>
         }
         ItemSeparatorComponent={() => <View style={styles.itemSeparator} />}
-        ListHeaderComponent={() =>
-          sections.map((section, index) => (
-            <View key={index}>
-              {renderSectionHeader({ section })}
-              {section.data.length === 0 && (
-                <Text style={styles.emptyText}>Nenhum item nesta seção</Text>
-              )}
-            </View>
-          ))
-        }
+        SectionSeparatorComponent={() => (
+          <View style={styles.sectionSeparator} />
+        )}
+        stickySectionHeadersEnabled={true}
       />
 
       {/* Modal para registrar pagamento */}
@@ -304,7 +294,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#333",
     paddingVertical: 10,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "#e0e0e0", // Cor de fundo para destacar os cabeçalhos
   },
   itemCard: {
     backgroundColor: "#fff",
@@ -330,6 +320,9 @@ const styles = StyleSheet.create({
   },
   itemSeparator: {
     height: 5,
+  },
+  sectionSeparator: {
+    height: 15, // Espaço maior entre seções
   },
   modalOverlay: {
     flex: 1,
