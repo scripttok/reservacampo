@@ -16,7 +16,8 @@ import { escolinhaService } from "../services/escolinhaService";
 
 export default function AlunosScreen({ navigation }) {
   const [alunos, setAlunos] = useState([]);
-  const [alunosFiltrados, setAlunosFiltrados] = useState([]);
+  const [professores, setProfessores] = useState([]);
+  const [professorSelecionado, setProfessorSelecionado] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [alunoSelecionado, setAlunoSelecionado] = useState(null);
@@ -25,8 +26,6 @@ export default function AlunosScreen({ navigation }) {
   const [telefoneResponsavel, setTelefoneResponsavel] = useState("");
   const [idade, setIdade] = useState("");
   const [turma, setTurma] = useState("");
-  const [termoBusca, setTermoBusca] = useState("");
-  const [professores, setProfessores] = useState([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -34,12 +33,15 @@ export default function AlunosScreen({ navigation }) {
         const alunosData = await alunoService.getAlunos();
         const aulasData = await escolinhaService.getAulas();
         setAlunos(alunosData);
-        setAlunosFiltrados(alunosData);
 
         const professoresUnicos = [
           ...new Set(aulasData.map((aula) => aula.responsavel)),
         ].filter(Boolean);
         setProfessores(professoresUnicos);
+
+        if (professoresUnicos.length > 0) {
+          setProfessorSelecionado(professoresUnicos[0]);
+        }
       } catch (error) {
         console.error("Erro ao carregar dados:", error);
         Alert.alert("Erro", "Não foi possível carregar os dados.");
@@ -48,16 +50,9 @@ export default function AlunosScreen({ navigation }) {
     fetchData();
   }, []);
 
-  useEffect(() => {
-    if (termoBusca.trim() === "") {
-      setAlunosFiltrados(alunos);
-    } else {
-      const filtrados = alunos.filter((aluno) =>
-        aluno.nome.toLowerCase().includes(termoBusca.toLowerCase())
-      );
-      setAlunosFiltrados(filtrados);
-    }
-  }, [termoBusca, alunos]);
+  const alunosFiltrados = professorSelecionado
+    ? alunos.filter((aluno) => aluno.turma === professorSelecionado)
+    : [];
 
   const handleAddAluno = () => {
     setEditMode(false);
@@ -102,7 +97,6 @@ export default function AlunosScreen({ navigation }) {
       }
       const alunosData = await alunoService.getAlunos();
       setAlunos(alunosData);
-      setAlunosFiltrados(alunosData);
       setModalVisible(false);
     } catch (error) {
       console.error("Erro ao salvar aluno:", error);
@@ -131,7 +125,6 @@ export default function AlunosScreen({ navigation }) {
             await alunoService.deleteAluno(id);
             const alunosData = await alunoService.getAlunos();
             setAlunos(alunosData);
-            setAlunosFiltrados(alunosData);
           } catch (error) {
             console.error("Erro ao excluir aluno:", error);
             Alert.alert("Erro", "Não foi possível excluir o aluno.");
@@ -140,6 +133,28 @@ export default function AlunosScreen({ navigation }) {
       },
     ]);
   };
+
+  const renderProfessor = ({ item }) => (
+    <TouchableOpacity
+      style={[
+        styles.professorItem,
+        professorSelecionado === item && styles.professorItemSelected,
+      ]}
+      onPress={() => setProfessorSelecionado(item)}
+      activeOpacity={0.7}
+    >
+      <Text
+        style={[
+          styles.professorText,
+          professorSelecionado === item && styles.professorTextSelected,
+        ]}
+        numberOfLines={1}
+        ellipsizeMode="tail"
+      >
+        {item}
+      </Text>
+    </TouchableOpacity>
+  );
 
   const renderAluno = ({ item }) => (
     <TouchableOpacity
@@ -153,19 +168,29 @@ export default function AlunosScreen({ navigation }) {
       }
     >
       <Text style={styles.alunoNome}>{item.nome}</Text>
-      <Text>Professor: {item.turma}</Text>
+      <Text>Responsável: {item.responsavel}</Text>
+      <Text>Telefone: {item.telefoneResponsavel}</Text>
+      <Text>Idade: {item.idade}</Text>
     </TouchableOpacity>
   );
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Lista de Alunos</Text>
-      <TextInput
-        style={styles.searchInput}
-        placeholder="Buscar por nome..."
-        value={termoBusca}
-        onChangeText={setTermoBusca}
-      />
+      <Text style={styles.title}>Lista de Alunos por Turma</Text>
+      <View>
+        <FlatList
+          data={professores}
+          renderItem={renderProfessor}
+          keyExtractor={(item) => item}
+          numColumns={3} // 3 botões por linha
+          showsVerticalScrollIndicator={false}
+          style={styles.professorList}
+          ListEmptyComponent={
+            <Text style={styles.emptyText}>Nenhum professor cadastrado.</Text>
+          }
+        />
+      </View>
+
       <TouchableOpacity style={styles.addButton} onPress={handleAddAluno}>
         <Text style={styles.addButtonText}>Adicionar Aluno</Text>
       </TouchableOpacity>
@@ -174,7 +199,11 @@ export default function AlunosScreen({ navigation }) {
         renderItem={renderAluno}
         keyExtractor={(item) => item.id}
         ListEmptyComponent={
-          <Text style={styles.emptyText}>Nenhum aluno encontrado.</Text>
+          <Text style={styles.emptyText}>
+            {professorSelecionado
+              ? "Nenhum aluno nesta turma."
+              : "Selecione uma turma para ver os alunos."}
+          </Text>
         }
       />
 
@@ -260,23 +289,41 @@ export default function AlunosScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
+    padding: 30,
     backgroundColor: "#f5f5f5",
+    marginTop: 30,
   },
   title: {
-    fontSize: 24,
+    fontSize: 16,
     fontWeight: "bold",
-    marginBottom: 10,
+    marginBottom: 15,
     textAlign: "center",
   },
-  searchInput: {
-    width: "100%",
-    padding: 10,
-    borderWidth: 1,
-    borderColor: "#ddd",
+  professorList: {
+    marginBottom: 1,
+  },
+  professorItem: {
+    paddingVertical: 6, // Compacto na vertical
+    paddingHorizontal: 12,
+    margin: 5, // Espaçamento entre botões
+    backgroundColor: "#ddd",
     borderRadius: 5,
-    marginBottom: 20,
-    backgroundColor: "#fff",
+    flex: 1, // Divide o espaço igualmente entre os 3 itens
+    alignItems: "center", // Centraliza o texto horizontalmente
+    justifyContent: "center", // Centraliza o texto verticalmente
+    maxWidth: "30%", // Limita a largura para caber 3 por linha
+  },
+  professorItemSelected: {
+    backgroundColor: "#007AFF",
+  },
+  professorText: {
+    fontSize: 14, // Tamanho de fonte menor
+    color: "#333",
+    textAlign: "center",
+  },
+  professorTextSelected: {
+    color: "#fff",
+    fontWeight: "bold",
   },
   addButton: {
     backgroundColor: "#007AFF",
@@ -284,6 +331,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
     marginBottom: 20,
+    marginTop: 5,
   },
   addButtonText: {
     color: "#fff",
@@ -301,11 +349,13 @@ const styles = StyleSheet.create({
   alunoNome: {
     fontSize: 18,
     fontWeight: "bold",
+    marginBottom: 5,
   },
   emptyText: {
     textAlign: "center",
     fontSize: 16,
     color: "#666",
+    paddingLeft: 5,
   },
   modalOverlay: {
     flex: 1,
