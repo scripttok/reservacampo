@@ -59,14 +59,6 @@ export default function CampoDetailScreen({ route, navigation }) {
       );
       const aulasFiltradas = updatedAulas.filter((a) => a.campoId === campo.id);
 
-      console.log(
-        "CampoDetailScreen: Turmas carregadas:",
-        turmasFiltradas.length
-      );
-      console.log(
-        "CampoDetailScreen: Aulas carregadas:",
-        aulasFiltradas.length
-      );
       setTurmasDoCampo(turmasFiltradas);
       setAulasDoCampo(aulasFiltradas);
       setHorarioFuncionamento(horario);
@@ -87,7 +79,7 @@ export default function CampoDetailScreen({ route, navigation }) {
     const endTime = parseTime(fim);
 
     while (currentTime < endTime) {
-      const nextTime = new Date(currentTime.getTime() + 90 * 60 * 1000); // Intervalo de 1h30
+      const nextTime = new Date(currentTime.getTime() + 90 * 60 * 1000);
       if (nextTime <= endTime) {
         const horarioInicio = formatTime(currentTime);
         const horarioFim = formatTime(nextTime);
@@ -126,7 +118,6 @@ export default function CampoDetailScreen({ route, navigation }) {
   };
 
   useEffect(() => {
-    // Combina turmas e aulas do dia selecionado para calcular horários ocupados
     const itensOcupados = [
       ...turmasDoCampo.filter(
         (item) => item.dia.toLowerCase() === diaSelecionado
@@ -138,13 +129,6 @@ export default function CampoDetailScreen({ route, navigation }) {
       inicio: item.inicio,
       fim: item.fim,
     }));
-
-    console.log(
-      "CampoDetailScreen: Itens ocupados no dia",
-      diaSelecionado,
-      ":",
-      itensOcupados
-    );
 
     const horariosLivres = calcularHorariosDisponiveis(
       horarioFuncionamento.inicio,
@@ -164,6 +148,7 @@ export default function CampoDetailScreen({ route, navigation }) {
     });
   };
 
+  // Funções específicas para o modo "turmas"
   const calcularProximoPagamento = (createdAt) => {
     if (!createdAt) return "Indefinido";
     const dataCriacao = new Date(createdAt);
@@ -177,7 +162,7 @@ export default function CampoDetailScreen({ route, navigation }) {
   };
 
   const isTurmaEmAtraso = (createdAt) => {
-    if (!createdAt) return false;
+    if (mode !== "turmas" || !createdAt) return false; // Só aplica no modo "turmas"
     const dataCriacao = new Date(createdAt);
     const proximoPagamento = new Date(dataCriacao);
     proximoPagamento.setDate(dataCriacao.getDate() + 30);
@@ -188,21 +173,24 @@ export default function CampoDetailScreen({ route, navigation }) {
   const blinkAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(blinkAnim, {
-          toValue: 0.2,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-        Animated.timing(blinkAnim, {
-          toValue: 1,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-  }, [blinkAnim]);
+    if (mode === "turmas") {
+      // Só ativa a animação no modo "turmas"
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(blinkAnim, {
+            toValue: 0.2,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(blinkAnim, {
+            toValue: 1,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    }
+  }, [blinkAnim, mode]);
 
   const handleDiaPress = (dia) => {
     setDiaSelecionado(dia);
@@ -310,7 +298,8 @@ export default function CampoDetailScreen({ route, navigation }) {
       <View style={styles.turmasContainer}>
         {itensDoDia.length > 0 ? (
           itensDoDia.map((item) => {
-            const emAtraso = isTurmaEmAtraso(item.createdAt);
+            const emAtraso =
+              mode === "turmas" ? isTurmaEmAtraso(item.createdAt) : false; // Atraso só para "turmas"
             return (
               <Animated.View
                 key={item.id}
@@ -344,11 +333,15 @@ export default function CampoDetailScreen({ route, navigation }) {
                 >
                   Criado em: {formatarDataCriacao(item.createdAt)}
                 </Text>
-                <Text
-                  style={[styles.turmaDetail, emAtraso && styles.textWhite]}
-                >
-                  Próximo pagamento: {calcularProximoPagamento(item.createdAt)}
-                </Text>
+                {/* Exibir "Próximo pagamento" apenas para "turmas" */}
+                {mode === "turmas" && (
+                  <Text
+                    style={[styles.turmaDetail, emAtraso && styles.textWhite]}
+                  >
+                    Próximo pagamento:{" "}
+                    {calcularProximoPagamento(item.createdAt)}
+                  </Text>
+                )}
                 <View style={styles.actions}>
                   <TouchableOpacity
                     style={styles.editButton}
@@ -373,10 +366,6 @@ export default function CampoDetailScreen({ route, navigation }) {
     </ScrollView>
   );
 }
-
-// Estilos permanecem iguais (omitidos por brevidade, use os mesmos do código anterior)
-
-// Estilos permanecem iguais (omitidos por brevidade)
 
 const styles = StyleSheet.create({
   container: {
