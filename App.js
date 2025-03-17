@@ -9,6 +9,7 @@ import CampoDetailScreen from "./src/screens/CampoDetailScreen";
 import AddCampoScreen from "./src/screens/AddCampoScreen";
 import AddTurmaScreen from "./src/screens/AddTurmaScreen";
 import AlunosScreen from "./src/screens/AlunosScreen";
+import PriceTableScreen from "./src/screens/PriceTableScreen";
 
 const Drawer = createDrawerNavigator();
 const Stack = createStackNavigator();
@@ -120,7 +121,7 @@ function CustomDrawerContent(props) {
         labelStyle={{ color: "#fff", fontSize: 18 }}
       />
       <DrawerItem
-        label="Alunos" // Novo botão adicionado aqui
+        label="Alunos"
         onPress={() => navigation.navigate("Alunos")}
         labelStyle={{ color: "#fff", fontSize: 18 }}
       />
@@ -137,6 +138,14 @@ function CustomDrawerContent(props) {
       <DrawerItem
         label="Configurar Horários"
         onPress={handleConfigHorarios}
+        labelStyle={{ color: "#fff", fontSize: 18 }}
+      />
+      <DrawerItem
+        label="Tabela de Preços"
+        onPress={() => {
+          navigation.navigate("PriceTable");
+          navigation.closeDrawer();
+        }}
         labelStyle={{ color: "#fff", fontSize: 18 }}
       />
     </DrawerContentScrollView>
@@ -169,6 +178,7 @@ export default function App() {
         />
         <Drawer.Screen name="Relatorios" component={PlaceholderScreen} />
         <Drawer.Screen name="Alunos" component={AlunosScreen} />
+        <Drawer.Screen name="PriceTable" component={PriceTableScreen} />
       </Drawer.Navigator>
     </NavigationContainer>
   );
