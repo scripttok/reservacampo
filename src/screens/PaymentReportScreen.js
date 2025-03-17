@@ -23,40 +23,49 @@ export default function PaymentReportScreen({ navigation }) {
   );
   const [nomeResponsavel, setNomeResponsavel] = useState("");
 
+  const fetchData = async () => {
+    try {
+      // Buscar turmas
+      const turmasData = await turmaService.getTurmas();
+      console.log("Turmas recebidas:", turmasData);
+
+      // Buscar alunos
+      const alunosData = await alunoService.getAlunos();
+      console.log("Alunos recebidos:", alunosData);
+
+      // Mapear os dados com type
+      const turmasMapped = turmasData.map((item) => ({
+        ...item,
+        type: "turma",
+      }));
+      const alunosMapped = alunosData.map((item) => ({
+        ...item,
+        type: "aluno",
+      }));
+
+      // Combinar em seções
+      const combinedSections = [
+        { title: "Turmas Cadastradas", data: turmasMapped },
+        { title: "Alunos Cadastrados", data: alunosMapped },
+      ];
+      console.log("Seções combinadas:", combinedSections);
+      setSections(combinedSections);
+    } catch (error) {
+      console.error("PaymentReportScreen: Erro ao carregar dados:", error);
+    }
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Buscar turmas
-        const turmasData = await turmaService.getTurmas();
-        console.log("Turmas recebidas:", turmasData);
+    fetchData(); // Carrega os dados na montagem inicial
 
-        // Buscar alunos
-        const alunosData = await alunoService.getAlunos();
-        console.log("Alunos recebidos:", alunosData);
+    // Adiciona um listener para recarregar os dados ao focar a tela
+    const unsubscribe = navigation.addListener("focus", () => {
+      fetchData();
+    });
 
-        // Mapear os dados com type
-        const turmasMapped = turmasData.map((item) => ({
-          ...item,
-          type: "turma",
-        }));
-        const alunosMapped = alunosData.map((item) => ({
-          ...item,
-          type: "aluno",
-        }));
-
-        // Combinar em seções
-        const combinedSections = [
-          { title: "Turmas Cadastradas", data: turmasMapped },
-          { title: "Alunos Cadastrados", data: alunosMapped },
-        ];
-        console.log("Seções combinadas:", combinedSections);
-        setSections(combinedSections);
-      } catch (error) {
-        console.error("PaymentReportScreen: Erro ao carregar dados:", error);
-      }
-    };
-    fetchData();
-  }, []);
+    // Limpa o listener ao desmontar a tela
+    return unsubscribe;
+  }, [navigation]);
 
   const calcularProximoPagamento = (createdAt) => {
     if (!createdAt) return "Indefinido";
@@ -112,7 +121,6 @@ export default function PaymentReportScreen({ navigation }) {
           </Text>
         </View>
       );
-      // Em PaymentReportScreen.js, dentro de renderItem
     } else if (item.type === "aluno") {
       return (
         <View style={styles.itemCard}>
@@ -158,7 +166,7 @@ export default function PaymentReportScreen({ navigation }) {
       </View>
 
       <SectionList
-        sections={sections} // Usamos sections em vez de data
+        sections={sections}
         renderItem={renderItem}
         keyExtractor={(item, index) => `${item.id}-${index}`}
         renderSectionHeader={renderSectionHeader}
@@ -295,7 +303,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#333",
     paddingVertical: 10,
-    backgroundColor: "#e0e0e0", // Cor de fundo para destacar os cabeçalhos
+    backgroundColor: "#e0e0e0",
   },
   itemCard: {
     backgroundColor: "#fff",
@@ -323,7 +331,7 @@ const styles = StyleSheet.create({
     height: 5,
   },
   sectionSeparator: {
-    height: 15, // Espaço maior entre seções
+    height: 15,
   },
   modalOverlay: {
     flex: 1,
