@@ -10,11 +10,13 @@ import {
   TextInput,
   Alert,
 } from "react-native";
+import { Picker } from "@react-native-picker/picker";
 import { alunoService } from "../services/alunoService";
+import { escolinhaService } from "../services/escolinhaService";
 
 export default function AlunosScreen({ navigation }) {
   const [alunos, setAlunos] = useState([]);
-  const [alunosFiltrados, setAlunosFiltrados] = useState([]); // Nova lista filtrada
+  const [alunosFiltrados, setAlunosFiltrados] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [alunoSelecionado, setAlunoSelecionado] = useState(null);
@@ -23,27 +25,32 @@ export default function AlunosScreen({ navigation }) {
   const [telefoneResponsavel, setTelefoneResponsavel] = useState("");
   const [idade, setIdade] = useState("");
   const [turma, setTurma] = useState("");
-  const [termoBusca, setTermoBusca] = useState(""); // Estado para o texto de busca
+  const [termoBusca, setTermoBusca] = useState("");
+  const [professores, setProfessores] = useState([]);
 
-  // Carregar lista de alunos ao montar a tela
   useEffect(() => {
-    const fetchAlunos = async () => {
+    const fetchData = async () => {
       try {
         const alunosData = await alunoService.getAlunos();
+        const aulasData = await escolinhaService.getAulas();
         setAlunos(alunosData);
-        setAlunosFiltrados(alunosData); // Inicializa a lista filtrada com todos os alunos
+        setAlunosFiltrados(alunosData);
+
+        const professoresUnicos = [
+          ...new Set(aulasData.map((aula) => aula.responsavel)),
+        ].filter(Boolean);
+        setProfessores(professoresUnicos);
       } catch (error) {
-        console.error("Erro ao carregar alunos:", error);
-        Alert.alert("Erro", "Não foi possível carregar a lista de alunos.");
+        console.error("Erro ao carregar dados:", error);
+        Alert.alert("Erro", "Não foi possível carregar os dados.");
       }
     };
-    fetchAlunos();
+    fetchData();
   }, []);
 
-  // Filtrar alunos com base no termo de busca
   useEffect(() => {
     if (termoBusca.trim() === "") {
-      setAlunosFiltrados(alunos); // Mostra todos os alunos se o campo estiver vazio
+      setAlunosFiltrados(alunos);
     } else {
       const filtrados = alunos.filter((aluno) =>
         aluno.nome.toLowerCase().includes(termoBusca.toLowerCase())
@@ -52,7 +59,6 @@ export default function AlunosScreen({ navigation }) {
     }
   }, [termoBusca, alunos]);
 
-  // Abrir modal para adicionar aluno
   const handleAddAluno = () => {
     setEditMode(false);
     setAlunoSelecionado(null);
@@ -60,11 +66,10 @@ export default function AlunosScreen({ navigation }) {
     setResponsavel("");
     setTelefoneResponsavel("");
     setIdade("");
-    setTurma("");
+    setTurma(professores.length > 0 ? professores[0] : "");
     setModalVisible(true);
   };
 
-  // Salvar ou atualizar aluno
   const handleSaveAluno = async () => {
     if (
       !nome.trim() ||
@@ -97,7 +102,7 @@ export default function AlunosScreen({ navigation }) {
       }
       const alunosData = await alunoService.getAlunos();
       setAlunos(alunosData);
-      setAlunosFiltrados(alunosData); // Atualiza a lista filtrada também
+      setAlunosFiltrados(alunosData);
       setModalVisible(false);
     } catch (error) {
       console.error("Erro ao salvar aluno:", error);
@@ -105,7 +110,6 @@ export default function AlunosScreen({ navigation }) {
     }
   };
 
-  // Abrir modal para editar aluno
   const handleEditAluno = (aluno) => {
     setEditMode(true);
     setAlunoSelecionado(aluno);
@@ -117,7 +121,6 @@ export default function AlunosScreen({ navigation }) {
     setModalVisible(true);
   };
 
-  // Excluir aluno
   const handleDeleteAluno = async (id) => {
     Alert.alert("Confirmar Exclusão", "Deseja realmente excluir este aluno?", [
       { text: "Cancelar", style: "cancel" },
@@ -128,7 +131,7 @@ export default function AlunosScreen({ navigation }) {
             await alunoService.deleteAluno(id);
             const alunosData = await alunoService.getAlunos();
             setAlunos(alunosData);
-            setAlunosFiltrados(alunosData); // Atualiza a lista filtrada
+            setAlunosFiltrados(alunosData);
           } catch (error) {
             console.error("Erro ao excluir aluno:", error);
             Alert.alert("Erro", "Não foi possível excluir o aluno.");
@@ -138,7 +141,6 @@ export default function AlunosScreen({ navigation }) {
     ]);
   };
 
-  // Renderizar cada item da lista
   const renderAluno = ({ item }) => (
     <TouchableOpacity
       style={styles.alunoItem}
@@ -151,24 +153,24 @@ export default function AlunosScreen({ navigation }) {
       }
     >
       <Text style={styles.alunoNome}>{item.nome}</Text>
-      <Text>Turma: {item.turma}</Text>
+      <Text>Professor: {item.turma}</Text>
     </TouchableOpacity>
   );
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Lista de Alunos</Text>
-      <TouchableOpacity style={styles.addButton} onPress={handleAddAluno}>
-        <Text style={styles.addButtonText}>Adicionar Aluno</Text>
-      </TouchableOpacity>
       <TextInput
         style={styles.searchInput}
         placeholder="Buscar por nome..."
         value={termoBusca}
         onChangeText={setTermoBusca}
       />
+      <TouchableOpacity style={styles.addButton} onPress={handleAddAluno}>
+        <Text style={styles.addButtonText}>Adicionar Aluno</Text>
+      </TouchableOpacity>
       <FlatList
-        data={alunosFiltrados} // Usa a lista filtrada
+        data={alunosFiltrados}
         renderItem={renderAluno}
         keyExtractor={(item) => item.id}
         ListEmptyComponent={
@@ -214,12 +216,26 @@ export default function AlunosScreen({ navigation }) {
               onChangeText={setIdade}
               keyboardType="numeric"
             />
-            <TextInput
-              style={styles.input}
-              placeholder="Turma"
-              value={turma}
-              onChangeText={setTurma}
-            />
+            <View style={styles.pickerContainer}>
+              <Text style={styles.pickerLabel}>Professor (Turma):</Text>
+              <Picker
+                selectedValue={turma}
+                onValueChange={(itemValue) => setTurma(itemValue)}
+                style={styles.picker}
+              >
+                {professores.length === 0 ? (
+                  <Picker.Item label="Nenhum professor disponível" value="" />
+                ) : (
+                  professores.map((professor) => (
+                    <Picker.Item
+                      key={professor}
+                      label={professor}
+                      value={professor}
+                    />
+                  ))
+                )}
+              </Picker>
+            </View>
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={styles.cancelButton}
@@ -250,7 +266,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: "bold",
-    marginBottom: 10, // Ajustado para dar espaço ao input de busca
+    marginBottom: 10,
     textAlign: "center",
   },
   searchInput: {
@@ -316,6 +332,22 @@ const styles = StyleSheet.create({
     borderColor: "#ddd",
     borderRadius: 5,
     marginBottom: 15,
+  },
+  pickerContainer: {
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 5,
+  },
+  pickerLabel: {
+    fontSize: 16,
+    color: "#333",
+    marginBottom: 5,
+    paddingHorizontal: 10,
+    paddingTop: 5,
+  },
+  picker: {
+    width: "100%",
   },
   modalButtons: {
     flexDirection: "row",
