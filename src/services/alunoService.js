@@ -22,7 +22,8 @@ export const alunoService = {
       responsavel,
       telefoneResponsavel,
       idade,
-      turma
+      turma,
+      new Date().toISOString() // Adiciona createdAt
     ).toFirestore();
     const docRef = await addDoc(collection(db, ALUNOS_COLLECTION), alunoData);
     console.log("alunoService: Aluno adicionado com ID:", docRef.id);
