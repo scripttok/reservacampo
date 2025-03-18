@@ -398,12 +398,13 @@ export default function PaymentReportScreen({ navigation, route }) {
 
 const styles = StyleSheet.create({
   container: {
+    marginTop: 30,
     flex: 1,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "#1f2f3a",
     padding: 15,
   },
   header: {
-    backgroundColor: "#007AFF",
+    backgroundColor: "#2ecc71",
     padding: 20,
     borderRadius: 10,
     alignItems: "center",
@@ -417,9 +418,9 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: "bold",
-    color: "#333",
+    color: "#fff",
     paddingVertical: 10,
-    backgroundColor: "#e0e0e0",
+    backgroundColor: "#2ecc71",
   },
   itemCard: {
     backgroundColor: "#fff",

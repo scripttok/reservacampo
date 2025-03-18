@@ -12,6 +12,7 @@ import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { paymentService } from "../services/paymentService";
 import { turmaService } from "../services/turmaService";
+import { alunoService } from "../services/alunoService";
 import { priceService } from "../services/priceService";
 
 export default function ReportsScreen({ navigation }) {
@@ -23,22 +24,35 @@ export default function ReportsScreen({ navigation }) {
   const [turmasLucro, setTurmasLucro] = useState([]);
   const [horariosLucro, setHorariosLucro] = useState([]);
   const [diasCheios, setDiasCheios] = useState([]);
+  const [atrasos, setAtrasos] = useState([]);
 
   const fetchData = async () => {
     try {
       const payments = await paymentService.getPayments();
       const turmas = await turmaService.getTurmas();
+      const alunos = await alunoService.getAlunos();
       const prices = await priceService.getPrices();
 
+      // Lucro total com verificação de tipoServico
       const lucro = payments.reduce(
         (acc, payment) => {
-          acc[payment.tipoServico.toLowerCase()] += payment.valor;
+          const tipoServico = payment.tipoServico
+            ? payment.tipoServico.toLowerCase()
+            : "desconhecido";
+          if (["turmas", "escolinha", "avulso"].includes(tipoServico)) {
+            acc[tipoServico] += payment.valor;
+          } else {
+            console.warn(
+              `ReportsScreen: Tipo de serviço inválido ou desconhecido: ${tipoServico}`
+            );
+          }
           return acc;
         },
         { turmas: 0, escolinha: 0, avulso: 0 }
       );
       setLucroTotal(lucro);
 
+      // Lucro por turma
       const turmasLucroData = turmas
         .map((turma) => {
           const turmaPayments = payments.filter(
@@ -50,6 +64,7 @@ export default function ReportsScreen({ navigation }) {
         .sort((a, b) => b.total - a.total);
       setTurmasLucro(turmasLucroData);
 
+      // Lucro por horário
       const horariosLucroData = turmas.reduce((acc, turma) => {
         const horario = `${turma.inicio} - ${turma.fim}`;
         const turmaPayments = payments.filter(
@@ -64,6 +79,7 @@ export default function ReportsScreen({ navigation }) {
         .sort((a, b) => b.total - a.total);
       setHorariosLucro(horariosArray);
 
+      // Dias mais cheios
       const diasCheiosData = turmas.reduce((acc, turma) => {
         acc[turma.dia] = (acc[turma.dia] || 0) + 1;
         return acc;
@@ -72,6 +88,19 @@ export default function ReportsScreen({ navigation }) {
         .map(([dia, count]) => ({ dia, count }))
         .sort((a, b) => b.count - a.count);
       setDiasCheios(diasArray);
+
+      // Turmas e Alunos em atraso
+      const turmasComType = turmas.map((turma) => ({
+        ...turma,
+        type: "turma",
+      }));
+      const alunosComType = alunos.map((aluno) => ({
+        ...aluno,
+        type: "aluno",
+      }));
+      const todosItens = [...turmasComType, ...alunosComType];
+      const atrasosData = calcularAtrasos(todosItens, payments, prices);
+      setAtrasos(atrasosData);
     } catch (error) {
       console.error("ReportsScreen: Erro ao carregar dados:", error);
       Alert.alert(
@@ -79,6 +108,63 @@ export default function ReportsScreen({ navigation }) {
         "Não foi possível carregar os dados para os relatórios."
       );
     }
+  };
+
+  const calcularAtrasos = (items, payments, prices) => {
+    const atrasados = [];
+    const today = new Date();
+
+    items.forEach((item) => {
+      const lastPayment = payments
+        .filter((p) => p.itemId === item.id)
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+
+      const diaCadastro = new Date(item.createdAt).getDate();
+
+      if (!lastPayment) {
+        const dataCriacao = new Date(item.createdAt);
+        const proximoPagamento = new Date(dataCriacao);
+        proximoPagamento.setMonth(proximoPagamento.getMonth() + 1);
+        proximoPagamento.setDate(1);
+        const ultimoDiaMes = new Date(
+          proximoPagamento.getFullYear(),
+          proximoPagamento.getMonth() + 1,
+          0
+        ).getDate(); // Correção aqui
+        proximoPagamento.setDate(Math.min(diaCadastro, ultimoDiaMes));
+        if (proximoPagamento < today) {
+          const valorDevido =
+            item.type === "turma" ? prices.turmas : prices.escolinha;
+          atrasados.push({
+            nome: item.nome,
+            tipo: item.type === "turma" ? "Turma" : "Aluno",
+            valorDevido,
+          });
+        }
+      } else {
+        const ultimaDataPagamento = new Date(lastPayment.createdAt);
+        const nextPaymentDate = new Date(ultimaDataPagamento);
+        nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
+        nextPaymentDate.setDate(1);
+        const ultimoDiaMes = new Date(
+          nextPaymentDate.getFullYear(),
+          nextPaymentDate.getMonth() + 1,
+          0
+        ).getDate(); // Correção aqui
+        nextPaymentDate.setDate(Math.min(diaCadastro, ultimoDiaMes));
+        if (nextPaymentDate < today) {
+          const valorDevido =
+            item.type === "turma" ? prices.turmas : prices.escolinha;
+          atrasados.push({
+            nome: item.nome,
+            tipo: item.type === "turma" ? "Turma" : "Aluno",
+            valorDevido,
+          });
+        }
+      }
+    });
+
+    return atrasados.sort((a, b) => a.nome.localeCompare(b.nome));
   };
 
   useEffect(() => {
@@ -94,9 +180,8 @@ export default function ReportsScreen({ navigation }) {
 
   const exportToCSV = async () => {
     try {
-      // Adiciona o BOM (\ufeff) para UTF-8 e usa ; como separador
       const csvData = [
-        "\ufeff", // BOM para Excel reconhecer UTF-8
+        "\ufeff",
         '"Relatório de Lucro Total"',
         '"Tipo de Serviço";"Valor (R$)"',
         `"Turmas";"${lucroTotal.turmas.toFixed(2)}"`,
@@ -114,6 +199,12 @@ export default function ReportsScreen({ navigation }) {
         '"Dias Mais Cheios"',
         '"Dia";"Quantidade de Turmas"',
         ...diasCheios.map((d) => `"${d.dia}";"${d.count}"`),
+        "",
+        '"Turmas e Alunos em Atraso"',
+        '"Nome";"Tipo";"Valor Devido (R$)"',
+        ...atrasos.map(
+          (a) => `"${a.nome}";"${a.tipo}";"${a.valorDevido.toFixed(2)}"`
+        ),
       ].join("\n");
 
       const fileUri = `${FileSystem.documentDirectory}relatorios_${
@@ -195,6 +286,19 @@ export default function ReportsScreen({ navigation }) {
           ))
         ) : (
           <Text style={styles.emptyText}>Nenhum dia registrado</Text>
+        )}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Turmas e Alunos em Atraso</Text>
+        {atrasos.length > 0 ? (
+          atrasos.map((item, index) => (
+            <Text key={index} style={styles.itemText}>
+              {item.nome} ({item.tipo}): R$ {item.valorDevido.toFixed(2)}
+            </Text>
+          ))
+        ) : (
+          <Text style={styles.emptyText}>Nenhum atraso registrado</Text>
         )}
       </View>
 
