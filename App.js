@@ -43,14 +43,6 @@ function HomeStack({ navigation, route, mode }) {
   );
 }
 
-function PlaceholderScreen({ navigation }) {
-  return (
-    <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-      <Text>Em Desenvolvimento</Text>
-    </View>
-  );
-}
-
 function CustomDrawerContent(props) {
   const { navigation, setMode, mode } = props;
 
