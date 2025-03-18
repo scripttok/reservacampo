@@ -294,6 +294,7 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   header: {
+    marginTop: 30,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -301,12 +302,12 @@ const styles = StyleSheet.create({
   },
   hamburger: {
     fontSize: 30,
-    color: "#007AFF",
+    color: "#fff",
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: "bold",
-    color: "red",
+    color: "#fff",
   },
   campoContainer: {
     flexDirection: "row",

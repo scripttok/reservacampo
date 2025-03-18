@@ -267,11 +267,6 @@ export default function CampoDetailScreen({ route, navigation }) {
         <Text style={styles.title}>
           {campo.nome} ({mode === "turmas" ? "Turmas" : "Escolinha"})
         </Text>
-        <TouchableOpacity style={styles.addButton} onPress={handleAddTurma}>
-          <Text style={styles.addButtonText}>
-            + Adicionar {mode === "turmas" ? "Turma" : "Aula"}
-          </Text>
-        </TouchableOpacity>
       </View>
 
       <FlatList
@@ -370,11 +365,11 @@ export default function CampoDetailScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "#04394e",
     padding: 15,
   },
   header: {
-    backgroundColor: "#007AFF",
+    backgroundColor: "#04394e",
     padding: 20,
     borderRadius: 10,
     marginBottom: 20,
