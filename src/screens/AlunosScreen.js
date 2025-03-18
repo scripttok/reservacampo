@@ -26,6 +26,7 @@ export default function AlunosScreen({ navigation }) {
   const [telefoneResponsavel, setTelefoneResponsavel] = useState("");
   const [idade, setIdade] = useState("");
   const [turma, setTurma] = useState("");
+  const [searchText, setSearchText] = useState("");
 
   const fetchData = async () => {
     try {
@@ -61,7 +62,11 @@ export default function AlunosScreen({ navigation }) {
   }, [navigation]); // Dependência: navigation
 
   const alunosFiltrados = professorSelecionado
-    ? alunos.filter((aluno) => aluno.turma === professorSelecionado)
+    ? alunos
+        .filter((aluno) => aluno.turma === professorSelecionado)
+        .filter((aluno) =>
+          aluno.nome.toLowerCase().includes(searchText.toLowerCase())
+        )
     : [];
 
   const handleAddAluno = () => {
@@ -213,6 +218,12 @@ export default function AlunosScreen({ navigation }) {
       <TouchableOpacity style={styles.addButton} onPress={handleAddAluno}>
         <Text style={styles.addButtonText}>Adicionar Aluno</Text>
       </TouchableOpacity>
+      <TextInput
+        style={styles.searchInput}
+        placeholder="Buscar aluno por nome..."
+        value={searchText}
+        onChangeText={setSearchText}
+      />
       <FlatList
         data={alunosFiltrados}
         renderItem={renderAluno}
@@ -317,6 +328,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginBottom: 15,
     textAlign: "center",
+    color: "#fff",
   },
   professorList: {
     marginBottom: 1,
@@ -441,5 +453,14 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "bold",
+  },
+  searchInput: {
+    width: "100%",
+    padding: 10,
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 5,
+    marginBottom: 15,
+    backgroundColor: "#fff",
   },
 });
