@@ -8,11 +8,14 @@ import {
   TouchableOpacity,
   Modal,
   TextInput,
+  Animated,
 } from "react-native";
 import { campoService } from "../services/campoService";
 import { turmaService } from "../services/turmaService";
-import { escolinhaService } from "../services/escolinhaService"; // Adicionado
+import { escolinhaService } from "../services/escolinhaService";
+import { alunoService } from "../services/alunoService"; // Adicionado
 import { configService } from "../services/configService";
+import { paymentService } from "../services/paymentService";
 import Campo from "../components/Campo";
 import { DrawerActions } from "@react-navigation/native";
 
@@ -21,13 +24,15 @@ export default function HomeScreen({ navigation, route }) {
   const [campos, setCampos] = useState([]);
   const [turmasOuAulas, setTurmasOuAulas] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [modalVisible, setModalVisible] = useState(false); // Modal de exclusão
+  const [modalVisible, setModalVisible] = useState(false);
   const [campoParaExcluir, setCampoParaExcluir] = useState(null);
-  const [addModalVisible, setAddModalVisible] = useState(false); // Modal de adicionar campo
-  const [configModalVisible, setConfigModalVisible] = useState(false); // Modal de configurar horários
+  const [addModalVisible, setAddModalVisible] = useState(false);
+  const [configModalVisible, setConfigModalVisible] = useState(false);
   const [novoCampoNome, setNovoCampoNome] = useState("");
   const [horarioInicio, setHorarioInicio] = useState("09:00");
   const [horarioFim, setHorarioFim] = useState("23:00");
+  const [atrasoItem, setAtrasoItem] = useState(null);
+  const [blinkAnim] = useState(new Animated.Value(1));
 
   useEffect(() => {
     const fetchData = async () => {
@@ -35,24 +40,33 @@ export default function HomeScreen({ navigation, route }) {
         console.log("HomeScreen: Buscando dados, modo atual:", mode);
         const camposData = await campoService.getCampos();
         const horario = await configService.getHorarioFuncionamento();
+        const paymentsData = await paymentService.getPayments();
+        console.log("HomeScreen: Payments Data:", paymentsData);
         let turmasOuAulasData = [];
         if (mode === "turmas") {
           turmasOuAulasData = await turmaService.getTurmas();
-          console.log(
-            "HomeScreen: Turmas carregadas:",
-            turmasOuAulasData.length
-          );
+          console.log("HomeScreen: Turmas carregadas:", turmasOuAulasData);
         } else {
-          turmasOuAulasData = await escolinhaService.getAulas();
-          console.log(
-            "HomeScreen: Aulas carregadas:",
-            turmasOuAulasData.length
-          );
+          turmasOuAulasData = await alunoService.getAlunos(); // Alterado para buscar alunos
+          console.log("HomeScreen: Alunos carregados:", turmasOuAulasData);
+          // Adicionar type: "aluno" se não estiver presente
+          turmasOuAulasData = turmasOuAulasData.map((item) => ({
+            ...item,
+            type: "aluno",
+          }));
         }
         setCampos(camposData);
         setTurmasOuAulas(turmasOuAulasData);
         setHorarioInicio(horario.inicio);
         setHorarioFim(horario.fim);
+
+        const atraso = checkPaymentStatus(
+          turmasOuAulasData,
+          paymentsData,
+          mode
+        );
+        console.log("HomeScreen: Item em atraso encontrado:", atraso);
+        setAtrasoItem(atraso);
       } catch (error) {
         console.error("HomeScreen: Erro ao carregar dados:", error);
       } finally {
@@ -61,7 +75,21 @@ export default function HomeScreen({ navigation, route }) {
     };
     fetchData();
 
-    // Definir funções nos parâmetros de navegação
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(blinkAnim, {
+          toValue: 0.2,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(blinkAnim, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+
     navigation.setParams({
       openAddModal: () => {
         console.log("HomeScreen: Abrindo modal de adicionar campo");
@@ -73,14 +101,115 @@ export default function HomeScreen({ navigation, route }) {
       },
     });
 
-    // Abrir modais com base nos parâmetros iniciais
-    if (openAddModal) {
-      setAddModalVisible(true);
-    }
-    if (openConfigModal) {
-      setConfigModalVisible(true);
-    }
+    if (openAddModal) setAddModalVisible(true);
+    if (openConfigModal) setConfigModalVisible(true);
   }, [navigation, mode]);
+
+  const checkPaymentStatus = (items, payments, currentMode) => {
+    if (!payments || !Array.isArray(payments)) {
+      console.log(
+        "HomeScreen: Dados de pagamentos inválidos ou ausentes:",
+        payments
+      );
+      return null;
+    }
+    if (!items || !Array.isArray(items)) {
+      console.log(
+        "HomeScreen: Dados de turmas/alunos inválidos ou ausentes:",
+        items
+      );
+      return null;
+    }
+
+    console.log(
+      `HomeScreen: Verificando atrasos no modo ${currentMode} com ${items.length} itens`
+    );
+
+    for (const item of items) {
+      if (!item.type || !item.createdAt) {
+        console.log(
+          "HomeScreen: Item inválido, faltando type ou createdAt:",
+          item
+        );
+        continue;
+      }
+
+      const lastPayment = payments
+        .filter((p) => p.itemId === item.id)
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+
+      const diaCadastro = new Date(item.createdAt).getDate();
+      const today = new Date();
+
+      console.log(
+        `HomeScreen: Verificando item ${item.nome || item.id}, type: ${
+          item.type
+        }, createdAt: ${item.createdAt}`
+      );
+
+      if (!lastPayment) {
+        const dataCriacao = new Date(item.createdAt);
+        const proximoPagamento = new Date(dataCriacao);
+        proximoPagamento.setMonth(proximoPagamento.getMonth() + 1);
+        proximoPagamento.setDate(1);
+        const ultimoDiaMes = new Date(
+          proximoPagamento.getFullYear(),
+          proximoPagamento.getMonth() + 1,
+          0
+        ).getDate();
+        proximoPagamento.setDate(Math.min(diaCadastro, ultimoDiaMes));
+        console.log(
+          `HomeScreen: Sem pagamento, próximo pagamento em ${proximoPagamento}`
+        );
+        if (
+          proximoPagamento < today &&
+          ((currentMode === "turmas" && item.type !== "aluno") ||
+            (currentMode === "escolinha" && item.type === "aluno"))
+        ) {
+          console.log(
+            `HomeScreen: Atraso detectado para ${item.nome || item.id}`
+          );
+          return item;
+        }
+      } else {
+        const ultimaDataPagamento = new Date(lastPayment.createdAt);
+        const nextPaymentDate = new Date(ultimaDataPagamento);
+        nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
+        nextPaymentDate.setDate(1);
+        const ultimoDiaMes = new Date(
+          nextPaymentDate.getFullYear(),
+          nextPaymentDate.getMonth() + 1,
+          0
+        ).getDate();
+        nextPaymentDate.setDate(Math.min(diaCadastro, ultimoDiaMes));
+        console.log(
+          `HomeScreen: Último pagamento em ${ultimaDataPagamento}, próximo em ${nextPaymentDate}`
+        );
+        if (
+          nextPaymentDate < today &&
+          ((currentMode === "turmas" && item.type !== "aluno") ||
+            (currentMode === "escolinha" && item.type === "aluno"))
+        ) {
+          console.log(
+            `HomeScreen: Atraso detectado para ${item.nome || item.id}`
+          );
+          return item;
+        }
+      }
+    }
+    console.log("HomeScreen: Nenhum atraso encontrado");
+    return null;
+  };
+
+  const handleAtrasoPress = () => {
+    if (atrasoItem) {
+      console.log(
+        "HomeScreen: Navegando para PaymentReport com item em atraso:",
+        atrasoItem
+      );
+      navigation.navigate("PaymentReport", { atrasoItemId: atrasoItem.id });
+    }
+  };
 
   const handleCampoPress = (campo) => {
     console.log("HomeScreen: Clicou no campo:", campo, "Modo:", mode);
@@ -144,10 +273,6 @@ export default function HomeScreen({ navigation, route }) {
     }
   };
 
-  const openDrawer = () => {
-    navigation.dispatch(DrawerActions.openDrawer());
-  };
-
   if (loading) {
     return (
       <View style={styles.container}>
@@ -159,7 +284,9 @@ export default function HomeScreen({ navigation, route }) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={openDrawer}>
+        <TouchableOpacity
+          onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
+        >
           <Text style={styles.hamburger}>☰</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
@@ -179,7 +306,6 @@ export default function HomeScreen({ navigation, route }) {
         ))}
       </ScrollView>
 
-      {/* Modal de Exclusão */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -210,7 +336,6 @@ export default function HomeScreen({ navigation, route }) {
         </View>
       </Modal>
 
-      {/* Modal de Adicionar Campo */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -244,7 +369,6 @@ export default function HomeScreen({ navigation, route }) {
         </View>
       </Modal>
 
-      {/* Modal de Configurar Horários */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -283,6 +407,14 @@ export default function HomeScreen({ navigation, route }) {
           </View>
         </View>
       </Modal>
+
+      {atrasoItem && (
+        <Animated.View style={[styles.atrasoButton, { opacity: blinkAnim }]}>
+          <TouchableOpacity onPress={handleAtrasoPress}>
+            <Text style={styles.atrasoButtonText}>Pagamento Atrasado!</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      )}
     </View>
   );
 }
@@ -366,6 +498,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   buttonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  atrasoButton: {
+    position: "absolute",
+    bottom: 20,
+    right: 20,
+    backgroundColor: "#dc3545",
+    padding: 15,
+    borderRadius: 10,
+    elevation: 5,
+  },
+  atrasoButtonText: {
     color: "#fff",
     fontSize: 16,
     fontWeight: "bold",
