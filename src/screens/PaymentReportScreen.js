@@ -71,8 +71,18 @@ export default function PaymentReportScreen({ navigation }) {
   const calcularProximoPagamento = (createdAt) => {
     if (!createdAt) return "Indefinido";
     const dataCriacao = new Date(createdAt);
+    const diaCadastro = dataCriacao.getDate();
     const proximoPagamento = new Date(dataCriacao);
-    proximoPagamento.setDate(dataCriacao.getDate() + 30);
+
+    proximoPagamento.setMonth(proximoPagamento.getMonth() + 1);
+    proximoPagamento.setDate(1); // Vai para o primeiro dia do próximo mês
+    const ultimoDiaMes = new Date(
+      proximoPagamento.getFullYear(),
+      proximoPagamento.getMonth() + 1,
+      0
+    ).getDate(); // Último dia do mês
+    proximoPagamento.setDate(Math.min(diaCadastro, ultimoDiaMes)); // Usa o menor entre o dia do cadastro e o último dia do mês
+
     return proximoPagamento.toLocaleDateString("pt-BR", {
       day: "2-digit",
       month: "2-digit",
@@ -85,17 +95,35 @@ export default function PaymentReportScreen({ navigation }) {
       .filter((p) => p.itemId === item.id)
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
 
+    const diaCadastro = new Date(item.createdAt).getDate();
+
     if (!lastPayment) {
-      const daysSinceCreation = Math.floor(
-        (new Date() - new Date(item.createdAt)) / (1000 * 60 * 60 * 24)
-      );
-      return daysSinceCreation > 31
+      const dataCriacao = new Date(item.createdAt);
+      const proximoPagamento = new Date(dataCriacao);
+      proximoPagamento.setMonth(proximoPagamento.getMonth() + 1);
+      proximoPagamento.setDate(1);
+      const ultimoDiaMes = new Date(
+        proximoPagamento.getFullYear(),
+        proximoPagamento.getMonth() + 1,
+        0
+      ).getDate();
+      proximoPagamento.setDate(Math.min(diaCadastro, ultimoDiaMes));
+      const hoje = new Date();
+      return proximoPagamento < hoje
         ? { status: "Atrasado", color: "#dc3545" }
         : null;
     }
 
-    const nextPaymentDate = new Date(lastPayment.createdAt);
-    nextPaymentDate.setDate(nextPaymentDate.getDate() + 30);
+    const ultimaDataPagamento = new Date(lastPayment.createdAt);
+    const nextPaymentDate = new Date(ultimaDataPagamento);
+    nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
+    nextPaymentDate.setDate(1);
+    const ultimoDiaMes = new Date(
+      nextPaymentDate.getFullYear(),
+      nextPaymentDate.getMonth() + 1,
+      0
+    ).getDate();
+    nextPaymentDate.setDate(Math.min(diaCadastro, ultimoDiaMes));
     const today = new Date();
     return nextPaymentDate > today
       ? { status: "Pago", color: "#28a745" }
