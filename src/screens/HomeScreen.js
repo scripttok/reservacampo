@@ -13,7 +13,7 @@ import {
 import { campoService } from "../services/campoService";
 import { turmaService } from "../services/turmaService";
 import { escolinhaService } from "../services/escolinhaService";
-import { alunoService } from "../services/alunoService"; // Adicionado
+import { alunoService } from "../services/alunoService";
 import { configService } from "../services/configService";
 import { paymentService } from "../services/paymentService";
 import Campo from "../components/Campo";
@@ -46,8 +46,13 @@ export default function HomeScreen({ navigation, route }) {
         if (mode === "turmas") {
           turmasOuAulasData = await turmaService.getTurmas();
           console.log("HomeScreen: Turmas carregadas:", turmasOuAulasData);
+          // Adicionar type: "turma" se não estiver presente
+          turmasOuAulasData = turmasOuAulasData.map((item) => ({
+            ...item,
+            type: "turma",
+          }));
         } else {
-          turmasOuAulasData = await alunoService.getAlunos(); // Alterado para buscar alunos
+          turmasOuAulasData = await alunoService.getAlunos();
           console.log("HomeScreen: Alunos carregados:", turmasOuAulasData);
           // Adicionar type: "aluno" se não estiver presente
           turmasOuAulasData = turmasOuAulasData.map((item) => ({
