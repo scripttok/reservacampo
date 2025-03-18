@@ -13,6 +13,7 @@ import {
 import { turmaService } from "../services/turmaService";
 import { alunoService } from "../services/alunoService";
 import { paymentService } from "../services/paymentService";
+import { priceService } from "../services/priceService";
 
 export default function PaymentReportScreen({ navigation }) {
   const [sections, setSections] = useState([]);
@@ -24,6 +25,8 @@ export default function PaymentReportScreen({ navigation }) {
     new Date().toISOString().split("T")[0]
   );
   const [nomeResponsavel, setNomeResponsavel] = useState("");
+  const [prices, setPrices] = useState({ turmas: 0, escolinha: 0, avulso: 0 });
+  const [payments, setPayments] = useState([]);
 
   const fetchData = async () => {
     try {
@@ -31,6 +34,13 @@ export default function PaymentReportScreen({ navigation }) {
       console.log("Turmas recebidas:", turmasData);
       const alunosData = await alunoService.getAlunos();
       console.log("Alunos recebidos:", alunosData);
+      const pricesData = await priceService.getPrices();
+      console.log("Preços recebidos:", pricesData);
+      const paymentsData = await paymentService.getPayments();
+      console.log("Pagamentos recebidos:", paymentsData);
+
+      setPrices(pricesData);
+      setPayments(paymentsData);
 
       const turmasMapped = turmasData.map((item) => ({
         ...item,
@@ -70,10 +80,39 @@ export default function PaymentReportScreen({ navigation }) {
     });
   };
 
+  const getPaymentStatus = (item) => {
+    const lastPayment = payments
+      .filter((p) => p.itemId === item.id)
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+
+    if (!lastPayment) {
+      const daysSinceCreation = Math.floor(
+        (new Date() - new Date(item.createdAt)) / (1000 * 60 * 60 * 24)
+      );
+      return daysSinceCreation > 31
+        ? { status: "Atrasado", color: "#dc3545" }
+        : null;
+    }
+
+    const nextPaymentDate = new Date(lastPayment.createdAt);
+    nextPaymentDate.setDate(nextPaymentDate.getDate() + 30);
+    const today = new Date();
+    return nextPaymentDate > today
+      ? { status: "Pago", color: "#28a745" }
+      : { status: "Atrasado", color: "#dc3545" };
+  };
+
   const handleOpenModal = (item) => {
     setSelectedItem(item);
     setTipoServico(item.type === "turma" ? "Turmas" : "Escolinha");
     setNomeResponsavel(item.responsavel || "");
+    setValor(
+      item.type === "turma"
+        ? prices.turmas.toString()
+        : item.type === "aluno"
+        ? prices.escolinha.toString()
+        : prices.avulso.toString()
+    );
     setModalVisible(true);
   };
 
@@ -90,6 +129,7 @@ export default function PaymentReportScreen({ navigation }) {
         createdAt: new Date().toISOString(),
       };
       await paymentService.addPayment(newPayment);
+      await fetchData(); // Atualiza a lista para refletir o novo pagamento
       setModalVisible(false);
       setValor("");
       alert(`Pagamento registrado para ${selectedItem.nome}!`);
@@ -101,7 +141,6 @@ export default function PaymentReportScreen({ navigation }) {
 
   const handleEditItem = () => {
     if (!selectedItem) return;
-    // Navegar para a tela de edição correspondente
     navigation.navigate(selectedItem.type === "turma" ? "Turmas" : "Alunos", {
       item: selectedItem,
     });
@@ -121,7 +160,7 @@ export default function PaymentReportScreen({ navigation }) {
             } else {
               await alunoService.deleteAluno(selectedItem.id);
             }
-            await fetchData(); // Atualiza a lista após exclusão
+            await fetchData();
             setModalVisible(false);
             alert(`${selectedItem.nome} excluído com sucesso!`);
           } catch (error) {
@@ -134,6 +173,7 @@ export default function PaymentReportScreen({ navigation }) {
   };
 
   const renderItem = ({ item }) => {
+    const paymentStatus = getPaymentStatus(item);
     return (
       <TouchableOpacity
         style={styles.itemCard}
@@ -180,6 +220,13 @@ export default function PaymentReportScreen({ navigation }) {
             </Text>
           </>
         )}
+        {paymentStatus && (
+          <View
+            style={[styles.statusBox, { backgroundColor: paymentStatus.color }]}
+          >
+            <Text style={styles.statusText}>{paymentStatus.status}</Text>
+          </View>
+        )}
       </TouchableOpacity>
     );
   };
@@ -211,7 +258,6 @@ export default function PaymentReportScreen({ navigation }) {
         stickySectionHeadersEnabled={true}
       />
 
-      {/* Modal para ações no item */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -288,7 +334,12 @@ export default function PaymentReportScreen({ navigation }) {
               >
                 <Text style={styles.buttonText}>Registrar Pagamento</Text>
               </TouchableOpacity>
-
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={handleEditItem}
+              >
+                <Text style={styles.buttonText}>Editar</Text>
+              </TouchableOpacity>
               <TouchableOpacity
                 style={styles.deleteButton}
                 onPress={handleDeleteItem}
@@ -344,11 +395,24 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    position: "relative",
   },
   itemText: {
     fontSize: 16,
     color: "#333",
     marginBottom: 5,
+  },
+  statusBox: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    padding: 5,
+    borderRadius: 5,
+  },
+  statusText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "bold",
   },
   emptyText: {
     fontSize: 16,
