@@ -12,6 +12,7 @@ import AddTurmaScreen from "./src/screens/AddTurmaScreen";
 import AlunosScreen from "./src/screens/AlunosScreen";
 import PriceTableScreen from "./src/screens/PriceTableScreen";
 import PaymentReportScreen from "./src/screens/PaymentReportScreen"; // Nova tela
+import ReportsScreen from "./src/screens/ReportsScreen";
 
 const Drawer = createDrawerNavigator();
 const Stack = createStackNavigator();
@@ -176,7 +177,7 @@ export default function App() {
         </Drawer.Screen>
         <Drawer.Screen name="PaymentReport" component={PaymentReportScreen} />
 
-        <Drawer.Screen name="Relatorios" component={PlaceholderScreen} />
+        <Drawer.Screen name="Relatorios" component={ReportsScreen} />
         <Drawer.Screen name="Alunos" component={AlunosScreen} />
         <Drawer.Screen name="PriceTable" component={PriceTableScreen} />
       </Drawer.Navigator>

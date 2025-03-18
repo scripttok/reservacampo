@@ -27,28 +27,38 @@ export default function AlunosScreen({ navigation }) {
   const [idade, setIdade] = useState("");
   const [turma, setTurma] = useState("");
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const alunosData = await alunoService.getAlunos();
-        const aulasData = await escolinhaService.getAulas();
-        setAlunos(alunosData);
+  const fetchData = async () => {
+    try {
+      const alunosData = await alunoService.getAlunos();
+      const aulasData = await escolinhaService.getAulas();
+      setAlunos(alunosData);
 
-        const professoresUnicos = [
-          ...new Set(aulasData.map((aula) => aula.responsavel)),
-        ].filter(Boolean);
-        setProfessores(professoresUnicos);
+      const professoresUnicos = [
+        ...new Set(aulasData.map((aula) => aula.responsavel)),
+      ].filter(Boolean);
+      setProfessores(professoresUnicos);
 
-        if (professoresUnicos.length > 0) {
-          setProfessorSelecionado(professoresUnicos[0]);
-        }
-      } catch (error) {
-        console.error("Erro ao carregar dados:", error);
-        Alert.alert("Erro", "Não foi possível carregar os dados.");
+      if (professoresUnicos.length > 0) {
+        setProfessorSelecionado(professoresUnicos[0]);
       }
-    };
-    fetchData();
-  }, []);
+    } catch (error) {
+      console.error("Erro ao carregar dados:", error);
+      Alert.alert("Erro", "Não foi possível carregar os dados.");
+    }
+  };
+
+  useEffect(() => {
+    fetchData(); // Carrega na montagem inicial
+
+    // Listener de foco para recarregar ao voltar para a tela
+    const unsubscribe = navigation.addListener("focus", () => {
+      console.log("AlunosScreen: Tela em foco, recarregando dados...");
+      fetchData();
+    });
+
+    // Limpa o listener ao desmontar
+    return unsubscribe;
+  }, [navigation]); // Dependência: navigation
 
   const alunosFiltrados = professorSelecionado
     ? alunos.filter((aluno) => aluno.turma === professorSelecionado)
