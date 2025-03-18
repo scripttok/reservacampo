@@ -15,7 +15,8 @@ import { alunoService } from "../services/alunoService";
 import { paymentService } from "../services/paymentService";
 import { priceService } from "../services/priceService";
 
-export default function PaymentReportScreen({ navigation }) {
+export default function PaymentReportScreen({ navigation, route }) {
+  const { atrasoItemId } = route.params || {}; // Captura o atrasoItemId dos parâmetros da rota
   const [sections, setSections] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
@@ -31,13 +32,13 @@ export default function PaymentReportScreen({ navigation }) {
   const fetchData = async () => {
     try {
       const turmasData = await turmaService.getTurmas();
-      console.log("Turmas recebidas:", turmasData);
+      console.log("Turmas recebidas:", turmasData); // Corrigido para console.log
       const alunosData = await alunoService.getAlunos();
-      console.log("Alunos recebidos:", alunosData);
+      console.log("Alunos recebidos:", alunosData); // Corrigido para console.log
       const pricesData = await priceService.getPrices();
-      console.log("Preços recebidos:", pricesData);
+      console.log("Preços recebidos:", pricesData); // Corrigido para console.log
       const paymentsData = await paymentService.getPayments();
-      console.log("Pagamentos recebidos:", paymentsData);
+      console.log("Pagamentos recebidos:", paymentsData); // Corrigido para console.log
 
       setPrices(pricesData);
       setPayments(paymentsData);
@@ -55,8 +56,15 @@ export default function PaymentReportScreen({ navigation }) {
         { title: "Turmas Cadastradas", data: turmasMapped },
         { title: "Alunos Cadastrados", data: alunosMapped },
       ];
-      console.log("Seções combinadas:", combinedSections);
       setSections(combinedSections);
+
+      // Abrir modal automaticamente se houver atrasoItemId
+      if (atrasoItemId) {
+        const item = [...turmasMapped, ...alunosMapped].find(
+          (i) => i.id === atrasoItemId
+        );
+        if (item) handleOpenModal(item);
+      }
     } catch (error) {
       console.error("PaymentReportScreen: Erro ao carregar dados:", error);
     }
@@ -66,7 +74,21 @@ export default function PaymentReportScreen({ navigation }) {
     fetchData();
     const unsubscribe = navigation.addListener("focus", fetchData);
     return unsubscribe;
-  }, [navigation]);
+  }, [navigation, atrasoItemId]);
+
+  const handleOpenModal = (item) => {
+    setSelectedItem(item);
+    setTipoServico(item.type === "turma" ? "Turmas" : "Escolinha");
+    setNomeResponsavel(item.responsavel || "");
+    setValor(
+      item.type === "turma"
+        ? prices.turmas.toString()
+        : item.type === "aluno"
+        ? prices.escolinha.toString()
+        : prices.avulso.toString()
+    );
+    setModalVisible(true);
+  };
 
   const calcularProximoPagamento = (createdAt) => {
     if (!createdAt) return "Indefinido";
@@ -128,20 +150,6 @@ export default function PaymentReportScreen({ navigation }) {
     return nextPaymentDate > today
       ? { status: "Pago", color: "#28a745" }
       : { status: "Atrasado", color: "#dc3545" };
-  };
-
-  const handleOpenModal = (item) => {
-    setSelectedItem(item);
-    setTipoServico(item.type === "turma" ? "Turmas" : "Escolinha");
-    setNomeResponsavel(item.responsavel || "");
-    setValor(
-      item.type === "turma"
-        ? prices.turmas.toString()
-        : item.type === "aluno"
-        ? prices.escolinha.toString()
-        : prices.avulso.toString()
-    );
-    setModalVisible(true);
   };
 
   const handleRegisterPayment = async () => {
