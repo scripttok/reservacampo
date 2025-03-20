@@ -14,25 +14,39 @@ import { checkHorarioConflito } from "../utils/horarioUtils";
 import { db } from "../services/firebaseService";
 import { collection, addDoc } from "firebase/firestore";
 import moment from "moment";
+import "moment/locale/pt-br"; // Importa o locale português
+
+moment.locale("pt-br");
 
 export default function AddTurmaScreen({ route, navigation }) {
-  const { campoId, dia, inicio, fim, turma, mode, data } = route.params || {};
+  const {
+    campoId,
+    dia,
+    inicio,
+    fim,
+    turma,
+    mode,
+    data,
+    tipo: tipoParam,
+  } = route.params || {};
   const [nome, setNome] = useState(turma?.nome || "");
   const [responsavel, setResponsavel] = useState(turma?.responsavel || "");
   const [telefone, setTelefone] = useState(turma?.telefone || "");
   const [turmaDia, setTurmaDia] = useState(
     data && moment(data).isValid()
-      ? moment(data).format("dddd").toLowerCase()
+      ? moment(data).format("dddd").toLowerCase().replace("-feira", "")
       : turma?.dia || dia || ""
   );
   const [turmaInicio, setTurmaInicio] = useState(turma?.inicio || inicio || "");
   const [turmaFim, setTurmaFim] = useState(turma?.fim || fim || "");
-  const [tipo, setTipo] = useState(mode || "turmas");
+  const [tipo, setTipo] = useState(tipoParam || mode || "turmas");
 
   useEffect(() => {
     if (data && moment(data).isValid()) {
       console.log("AddTurmaScreen: Data recebida do Calendario:", data);
-      setTurmaDia(moment(data).format("dddd").toLowerCase());
+      setTurmaDia(
+        moment(data).format("dddd").toLowerCase().replace("-feira", "")
+      );
     } else if (dia && inicio && fim) {
       console.log("AddTurmaScreen: Preenchendo com horário disponível:", {
         dia,
@@ -115,13 +129,13 @@ export default function AddTurmaScreen({ route, navigation }) {
           horarioInicio: turmaInicio,
           horarioFim: turmaFim,
           nome: nome,
-          tipo: "avulsa",
+          tipo: "mensal", // Alterado para "mensal"
           campoId: campoId,
           responsavel: responsavel,
           telefone: telefone,
         };
         await salvarReservaNoFirestore(reserva);
-        console.log("AddTurmaScreen: Reserva avulsa salva com sucesso");
+        console.log("AddTurmaScreen: Reserva mensal salva com sucesso");
       } else if (tipo === "turmas") {
         if (turma?.id) {
           await turmaService.updateTurma(turma.id, novaTurmaOuAula);

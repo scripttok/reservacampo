@@ -10,14 +10,13 @@ import {
   Animated,
 } from "react-native";
 import moment from "moment";
-import "moment/locale/pt-br"; // Importa o locale português
+import "moment/locale/pt-br";
 import { turmaService } from "../services/turmaService";
 import { escolinhaService } from "../services/escolinhaService";
 import { configService } from "../services/configService";
 import { db } from "../services/firebaseService";
 import { collection, query, where, getDocs } from "firebase/firestore";
 
-// Configura o locale para português
 moment.locale("pt-br");
 
 export default function CampoDetailScreen({ route, navigation }) {
@@ -61,17 +60,14 @@ export default function CampoDetailScreen({ route, navigation }) {
         (t) => t.campoId === campo.id
       );
       const aulasFiltradas = updatedAulas.filter((a) => a.campoId === campo.id);
-      const reservasFiltradas = reservas.filter((r) =>
-        moment(r.data).isSame(moment(), "week")
-      );
-
+      // Não filtramos mais por semana aqui, pois reservas mensais se repetem
       console.log("CampoDetailScreen: Turmas filtradas:", turmasFiltradas);
       console.log("CampoDetailScreen: Aulas filtradas:", aulasFiltradas);
-      console.log("CampoDetailScreen: Reservas filtradas:", reservasFiltradas);
+      console.log("CampoDetailScreen: Reservas carregadas:", reservas);
 
       setTurmasDoCampo(turmasFiltradas);
       setAulasDoCampo(aulasFiltradas);
-      setReservasDoFirestore(reservasFiltradas);
+      setReservasDoFirestore(reservas);
       setHorarioFuncionamento(horario);
     };
 
@@ -109,13 +105,19 @@ export default function CampoDetailScreen({ route, navigation }) {
         const diaReserva = moment(reserva.data)
           .format("dddd")
           .toLowerCase()
-          .replace("-feira", ""); // Remove o sufixo "-feira"
+          .replace("-feira", "");
         const isSameWeek = moment(reserva.data).isSame(moment(), "week");
         const matchesDay = diaReserva === diaSelecionado;
+        // Para reservas mensais, ignoramos a data específica e repetimos semanalmente
+        const isMensal = reserva.tipo === "mensal";
         console.log(
-          `CampoDetailScreen: Filtrando reserva ${reserva.id} - Data: ${reserva.data}, Dia: ${diaReserva}, Semana Atual: ${isSameWeek}, Dia Selecionado: ${diaSelecionado}, Matches: ${matchesDay}`
+          `CampoDetailScreen: Filtrando reserva ${reserva.id} - Data: ${
+            reserva.data
+          }, Dia: ${diaReserva}, Semana Atual: ${isSameWeek}, Dia Selecionado: ${diaSelecionado}, Tipo: ${
+            reserva.tipo
+          }, Matches: ${isMensal ? matchesDay : matchesDay && isSameWeek}`
         );
-        return matchesDay && isSameWeek;
+        return isMensal ? matchesDay : matchesDay && isSameWeek;
       })
       .map((reserva) => ({
         ...reserva,
@@ -183,14 +185,16 @@ export default function CampoDetailScreen({ route, navigation }) {
         (item) => item.dia && item.dia.toLowerCase() === diaSelecionado
       ),
       ...reservasDoFirestore
-        .filter(
-          (reserva) =>
-            moment(reserva.data)
-              .format("dddd")
-              .toLowerCase()
-              .replace("-feira", "") === diaSelecionado &&
-            moment(reserva.data).isSame(moment(), "week")
-        )
+        .filter((reserva) => {
+          const diaReserva = moment(reserva.data)
+            .format("dddd")
+            .toLowerCase()
+            .replace("-feira", "");
+          const isSameWeek = moment(reserva.data).isSame(moment(), "week");
+          const matchesDay = diaReserva === diaSelecionado;
+          const isMensal = reserva.tipo === "mensal";
+          return isMensal ? matchesDay : matchesDay && isSameWeek;
+        })
         .map((reserva) => ({
           inicio: reserva.horarioInicio,
           fim: reserva.horarioFim,
@@ -285,6 +289,7 @@ export default function CampoDetailScreen({ route, navigation }) {
       inicio: horario.inicio,
       fim: horario.fim,
       mode,
+      tipo: "mensal", // Força reservas como mensais
     });
   };
 
@@ -342,26 +347,6 @@ export default function CampoDetailScreen({ route, navigation }) {
           {campo.nome} ({mode === "turmas" ? "Turmas" : "Escolinha"})
         </Text>
       </View>
-      <FlatList
-        data={diasDaSemana}
-        renderItem={renderDiaButton}
-        keyExtractor={(item) => item}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.diasContainer}
-      />
-
-      <FlatList
-        data={horariosDisponiveis}
-        renderItem={renderHorarioButton}
-        keyExtractor={(item) => `${item.inicio}-${item.fim}`}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.horariosContainer}
-        ListEmptyComponent={
-          <Text style={styles.noHorarioText}>Nenhum horário disponível</Text>
-        }
-      />
       <View style={styles.turmasContainer}>
         {itensDoDia.length > 0 ? (
           itensDoDia.map((item) => {
@@ -440,6 +425,27 @@ export default function CampoDetailScreen({ route, navigation }) {
           <Text style={styles.noTurmaText}>Nenhum item neste dia</Text>
         )}
       </View>
+
+      <FlatList
+        data={diasDaSemana}
+        renderItem={renderDiaButton}
+        keyExtractor={(item) => item}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.diasContainer}
+      />
+
+      <FlatList
+        data={horariosDisponiveis}
+        renderItem={renderHorarioButton}
+        keyExtractor={(item) => `${item.inicio}-${item.fim}`}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.horariosContainer}
+        ListEmptyComponent={
+          <Text style={styles.noHorarioText}>Nenhum horário disponível</Text>
+        }
+      />
     </ScrollView>
   );
 }
@@ -467,17 +473,6 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#fff",
     marginBottom: 10,
-  },
-  addButton: {
-    backgroundColor: "#fff",
-    paddingVertical: 8,
-    paddingHorizontal: 15,
-    borderRadius: 5,
-  },
-  addButtonText: {
-    color: "#007AFF",
-    fontSize: 16,
-    fontWeight: "bold",
   },
   diasContainer: {
     marginBottom: 15,
@@ -534,10 +529,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-  },
-  turmaCardDestacada: {
-    borderWidth: 2,
-    borderColor: "#ffcc00",
   },
   turmaTime: {
     fontSize: 18,
