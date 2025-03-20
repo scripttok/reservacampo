@@ -24,15 +24,28 @@ export const escolinhaService = {
     return aulasList;
   },
 
-  async addAula(aula) {
-    console.log("escolinhaService: Adicionando aula:", aula);
-    const createdAt = new Date().toISOString(); // Data atual em formato ISO
-    const aulaComData = { ...aula, createdAt };
+  async addAula({ campoId, dia, inicio, fim, nome, responsavel, telefone }) {
+    console.log("escolinhaService: Adicionando aula:", {
+      campoId,
+      dia,
+      inicio,
+      fim,
+    });
+    if (!dia) throw new Error("O campo 'dia' é obrigatório");
+    const createdAt = new Date().toISOString();
+    const aulaComData = {
+      campoId,
+      dia,
+      inicio,
+      fim,
+      nome,
+      responsavel,
+      telefone,
+      createdAt,
+    };
     const aulasCol = collection(db, ESCOLINHA_COLLECTION);
     const docRef = await addDoc(aulasCol, aulaComData);
-    const novaAula = { id: docRef.id, ...aulaComData };
-    console.log("escolinhaService: Aula adicionada com ID:", docRef.id);
-    return novaAula;
+    return { id: docRef.id, ...aulaComData };
   },
 
   async updateAula(id, aulaAtualizada) {

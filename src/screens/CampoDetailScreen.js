@@ -12,6 +12,8 @@ import {
 import { turmaService } from "../services/turmaService";
 import { escolinhaService } from "../services/escolinhaService";
 import { configService } from "../services/configService";
+import { db } from "../services/firebaseService";
+import { collection, query, where, getDocs } from "firebase/firestore";
 
 export default function CampoDetailScreen({ route, navigation }) {
   const {
@@ -44,6 +46,18 @@ export default function CampoDetailScreen({ route, navigation }) {
 
   useEffect(() => {
     const fetchData = async () => {
+      const reservasDoDia = await buscarReservasDoFirestore(
+        campo.id,
+        diaSelecionado
+      );
+      console.log("Reservas do dia:", reservasDoDia);
+      // Atualize o estado com as reservas encontradas
+    };
+    fetchData();
+  }, [diaSelecionado]);
+
+  useEffect(() => {
+    const fetchData = async () => {
       console.log(
         "CampoDetailScreen: Buscando dados para o campo:",
         campo.nome,
@@ -69,10 +83,12 @@ export default function CampoDetailScreen({ route, navigation }) {
     return () => unsubscribe();
   }, [navigation, campo.id, mode]);
 
-  const itensDoDia = (mode === "turmas" ? turmasDoCampo : aulasDoCampo)
-    .filter((item) => item.dia.toLowerCase() === diaSelecionado)
-    .sort((a, b) => a.inicio.localeCompare(b.inicio));
-
+  const itensDoDia = [
+    ...turmasDoCampo.filter(
+      (item) => item.dia && item.dia.toLowerCase() === diaSelecionado
+    ),
+    ...reservasDoFirestore, // Adicione as reservas do Firestore
+  ].sort((a, b) => a.horarioInicio.localeCompare(b.horarioInicio));
   const calcularHorariosDisponiveis = (inicio, fim, itensOcupados) => {
     const horarios = [];
     let currentTime = parseTime(inicio);
@@ -117,13 +133,33 @@ export default function CampoDetailScreen({ route, navigation }) {
     return start1 < end2 && start2 < end1;
   };
 
+  const buscarReservasDoFirestore = async (campoId, diaSelecionado) => {
+    try {
+      const reservasRef = collection(db, "reservas");
+      const q = query(
+        reservasRef,
+        where("campoId", "==", campoId),
+        where("data", "==", moment(diaSelecionado).format("YYYY-MM-DD"))
+      );
+      const querySnapshot = await getDocs(q);
+      const reservas = [];
+      querySnapshot.forEach((doc) => {
+        reservas.push(doc.data());
+      });
+      return reservas;
+    } catch (error) {
+      console.error("Erro ao buscar reservas do Firestore:", error);
+      return [];
+    }
+  };
+
   useEffect(() => {
     const itensOcupados = [
       ...turmasDoCampo.filter(
-        (item) => item.dia.toLowerCase() === diaSelecionado
+        (item) => item.dia && item.dia.toLowerCase() === diaSelecionado
       ),
       ...aulasDoCampo.filter(
-        (item) => item.dia.toLowerCase() === diaSelecionado
+        (item) => item.dia && item.dia.toLowerCase() === diaSelecionado
       ),
     ].map((item) => ({
       inicio: item.inicio,

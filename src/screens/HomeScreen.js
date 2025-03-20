@@ -45,19 +45,15 @@ export default function HomeScreen({ navigation, route }) {
         let turmasOuAulasData = [];
         if (mode === "turmas") {
           turmasOuAulasData = await turmaService.getTurmas();
-          console.log("HomeScreen: Turmas carregadas:", turmasOuAulasData);
-          // Adicionar type: "turma" se não estiver presente
           turmasOuAulasData = turmasOuAulasData.map((item) => ({
             ...item,
             type: "turma",
           }));
         } else {
-          turmasOuAulasData = await alunoService.getAlunos();
-          console.log("HomeScreen: Alunos carregados:", turmasOuAulasData);
-          // Adicionar type: "aluno" se não estiver presente
+          turmasOuAulasData = await escolinhaService.getAulas();
           turmasOuAulasData = turmasOuAulasData.map((item) => ({
             ...item,
-            type: "aluno",
+            type: "aula",
           }));
         }
         setCampos(camposData);
@@ -131,7 +127,8 @@ export default function HomeScreen({ navigation, route }) {
     );
 
     for (const item of items) {
-      if (!item.type || !item.createdAt) {
+      // Verificação de segurança
+      if (!item || !item.type || !item.createdAt) {
         console.log(
           "HomeScreen: Item inválido, faltando type ou createdAt:",
           item

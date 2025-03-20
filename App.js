@@ -1,4 +1,3 @@
-// App.js
 import React, { useState } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createDrawerNavigator } from "@react-navigation/drawer";
@@ -13,6 +12,7 @@ import AlunosScreen from "./src/screens/AlunosScreen";
 import PriceTableScreen from "./src/screens/PriceTableScreen";
 import PaymentReportScreen from "./src/screens/PaymentReportScreen"; // Nova tela
 import ReportsScreen from "./src/screens/ReportsScreen";
+import CalendarioScreen from "./src/screens/CalendarioScreen"; // Importe a nova tela
 
 const Drawer = createDrawerNavigator();
 const Stack = createStackNavigator();
@@ -143,6 +143,15 @@ function CustomDrawerContent(props) {
         }}
         labelStyle={{ color: "#fff", fontSize: 18 }}
       />
+      {/* Novo item para o Calendário */}
+      <DrawerItem
+        label="Calendário"
+        onPress={() => {
+          navigation.navigate("Calendario");
+          navigation.closeDrawer();
+        }}
+        labelStyle={{ color: "#fff", fontSize: 18 }}
+      />
     </DrawerContentScrollView>
   );
 }
@@ -168,10 +177,11 @@ export default function App() {
           {(props) => <HomeStack {...props} mode={mode} />}
         </Drawer.Screen>
         <Drawer.Screen name="PaymentReport" component={PaymentReportScreen} />
-
         <Drawer.Screen name="Relatorios" component={ReportsScreen} />
         <Drawer.Screen name="Alunos" component={AlunosScreen} />
         <Drawer.Screen name="PriceTable" component={PriceTableScreen} />
+        {/* Nova rota para o Calendário */}
+        <Drawer.Screen name="Calendario" component={CalendarioScreen} />
       </Drawer.Navigator>
     </NavigationContainer>
   );
