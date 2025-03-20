@@ -1,10 +1,10 @@
-import React, { useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+// src/screens/CalendarioScreen.js
+import React, { useState, useEffect } from "react";
+import { View, Text, StyleSheet } from "react-native";
 import { Calendar, LocaleConfig } from "react-native-calendars";
+import { Picker } from "@react-native-picker/picker";
 import moment from "moment";
-import { turmaService } from "../services/turmaService";
-import { db } from "../services/firebaseService";
-import { collection, addDoc } from "firebase/firestore";
+import { campoService } from "../services/campoService";
 
 LocaleConfig.locales["pt"] = {
   monthNames: [
@@ -53,76 +53,95 @@ export default function CalendarioScreen({ navigation }) {
     moment().format("YYYY-MM-DD")
   );
   const [reservas, setReservas] = useState({});
+  const [campos, setCampos] = useState([]);
+  const [selectedCampoId, setSelectedCampoId] = useState("");
+  const [isLoading, setIsLoading] = useState(true); // Novo estado para controle de carregamento
 
-  // Função para cadastrar uma reserva mensal
-  const cadastrarReservaMensal = async (
-    diaSemana,
-    horarioInicio,
-    horarioFim,
-    turma,
-    campoId
-  ) => {
-    const mesAtual = moment().month();
-    const anoAtual = moment().year();
-    const diasDoMes = moment(
-      `${anoAtual}-${mesAtual + 1}`,
-      "YYYY-MM"
-    ).daysInMonth();
-
-    for (let dia = 1; dia <= diasDoMes; dia++) {
-      const data = moment(`${anoAtual}-${mesAtual + 1}-${dia}`, "YYYY-MM-DD");
-      if (data.day() === diaSemana) {
-        // Verifica se é o dia da semana correto
-        const dataFormatada = data.format("YYYY-MM-DD");
-        const reserva = {
-          data: dataFormatada,
-          horarioInicio,
-          horarioFim,
-          nome: turma.nome,
-          tipo: "mensal",
-          campoId,
-        };
-        await salvarReservaNoFirestore(reserva);
+  useEffect(() => {
+    const fetchCampos = async () => {
+      console.log("CalendarioScreen: Iniciando busca de campos");
+      try {
+        const camposData = await campoService.getCampos();
+        console.log("CalendarioScreen: Campos recebidos:", camposData);
+        setCampos(camposData);
+        if (camposData.length > 0) {
+          console.log(
+            "CalendarioScreen: Definindo campo padrão:",
+            camposData[0].id
+          );
+          setSelectedCampoId(camposData[0].id);
+        } else {
+          console.log("CalendarioScreen: Nenhum campo encontrado");
+        }
+      } catch (error) {
+        console.error("CalendarioScreen: Erro ao buscar campos:", error);
+      } finally {
+        console.log("CalendarioScreen: Finalizando busca de campos");
+        setIsLoading(false); // Marca como concluído, mesmo com erro
       }
-    }
-  };
-
-  const salvarReservaNoFirestore = async (reserva) => {
-    try {
-      const reservasRef = collection(db, "reservas");
-      await addDoc(reservasRef, reserva);
-      console.log("Reserva salva no Firestore:", reserva);
-    } catch (error) {
-      console.error("Erro ao salvar reserva no Firestore:", error);
-    }
-  };
-
-  // Função para cadastrar uma reserva avulsa
-  const cadastrarReservaAvulsa = async (
-    data,
-    horarioInicio,
-    horarioFim,
-    turma,
-    campoId
-  ) => {
-    const dataFormatada = moment(data).format("YYYY-MM-DD");
-    const reserva = {
-      data: dataFormatada,
-      horarioInicio,
-      horarioFim,
-      nome: turma.nome,
-      tipo: "avulsa",
-      campoId,
     };
-    await salvarReservaNoFirestore(reserva);
+    fetchCampos();
+  }, []);
+
+  const handleDayPress = (day) => {
+    setSelectedDate(day.dateString);
+    if (!selectedCampoId) {
+      alert("Por favor, selecione um campo antes de continuar!");
+      return;
+    }
+    console.log(
+      "CalendarioScreen: Navegando para AddTurma com data:",
+      day.dateString,
+      "e campoId:",
+      selectedCampoId
+    );
+    navigation.navigate("HomeStack", {
+      screen: "AddTurma",
+      params: {
+        data: day.dateString,
+        mode: "escolinha",
+        campoId: selectedCampoId,
+      },
+    });
   };
 
   return (
     <View style={styles.container}>
+      <Text style={styles.label}>Selecione um Campo:</Text>
+      <Picker
+        selectedValue={selectedCampoId}
+        onValueChange={(itemValue) => {
+          console.log("CalendarioScreen: Campo selecionado:", itemValue);
+          setSelectedCampoId(itemValue);
+        }}
+        style={styles.picker}
+      >
+        {isLoading ? (
+          <Picker.Item label="Carregando campos..." value="" />
+        ) : campos.length === 0 ? (
+          <Picker.Item label="Nenhum campo disponível" value="" />
+        ) : (
+          campos.map((campo) => (
+            <Picker.Item
+              key={campo.id}
+              label={campo.nome || "Campo sem nome"}
+              value={campo.id}
+            />
+          ))
+        )}
+      </Picker>
+      {campos.length === 0 && !isLoading && (
+        <Text style={styles.noCamposText}>
+          Nenhum campo disponível ou erro ao carregar.
+        </Text>
+      )}
       <Calendar
         current={selectedDate}
-        onDayPress={(day) => setSelectedDate(day.dateString)}
-        markedDates={reservas}
+        onDayPress={handleDayPress}
+        markedDates={{
+          ...reservas,
+          [selectedDate]: { selected: true, selectedColor: "#007AFF" },
+        }}
         markingType="multi-dot"
         theme={{
           calendarBackground: "#fff",
@@ -133,32 +152,6 @@ export default function CalendarioScreen({ navigation }) {
           selectedDotColor: "#fff",
         }}
       />
-
-      <TouchableOpacity
-        style={styles.button}
-        onPress={() =>
-          cadastrarReservaMensal(
-            1, // Segunda-feira (0 = domingo, 1 = segunda, etc.)
-            "14:00",
-            "15:30",
-            { nome: "Turma de Futebol", responsavel: "João" }
-          )
-        }
-      >
-        <Text style={styles.buttonText}>Cadastrar Reserva Mensal</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.button}
-        onPress={() =>
-          cadastrarReservaAvulsa("2023-11-12", "10:00", "11:30", {
-            nome: "Reserva Avulsa",
-            responsavel: "Maria",
-          })
-        }
-      >
-        <Text style={styles.buttonText}>Cadastrar Reserva Avulsa</Text>
-      </TouchableOpacity>
     </View>
   );
 }
@@ -169,16 +162,23 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: "#fff",
   },
-  button: {
-    backgroundColor: "#007AFF",
-    padding: 15,
-    borderRadius: 10,
-    alignItems: "center",
-    marginTop: 20,
-  },
-  buttonText: {
-    color: "#fff",
+  label: {
     fontSize: 16,
     fontWeight: "bold",
+    marginBottom: 10,
+    color: "#333",
+  },
+  picker: {
+    height: 50,
+    width: "100%",
+    marginBottom: 20,
+    backgroundColor: "#f0f0f0",
+    borderRadius: 5,
+  },
+  noCamposText: {
+    fontSize: 14,
+    color: "#999",
+    marginBottom: 10,
+    textAlign: "center",
   },
 });

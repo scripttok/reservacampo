@@ -11,19 +11,29 @@ import {
 import { turmaService } from "../services/turmaService";
 import { escolinhaService } from "../services/escolinhaService";
 import { checkHorarioConflito } from "../utils/horarioUtils";
+import { db } from "../services/firebaseService";
+import { collection, addDoc } from "firebase/firestore";
+import moment from "moment";
 
 export default function AddTurmaScreen({ route, navigation }) {
-  const { campoId, dia, inicio, fim, turma, mode } = route.params || {};
+  const { campoId, dia, inicio, fim, turma, mode, data } = route.params || {};
   const [nome, setNome] = useState(turma?.nome || "");
   const [responsavel, setResponsavel] = useState(turma?.responsavel || "");
   const [telefone, setTelefone] = useState(turma?.telefone || "");
-  const [turmaDia, setTurmaDia] = useState(turma?.dia || dia || "");
+  const [turmaDia, setTurmaDia] = useState(
+    data && moment(data).isValid()
+      ? moment(data).format("dddd").toLowerCase()
+      : turma?.dia || dia || ""
+  );
   const [turmaInicio, setTurmaInicio] = useState(turma?.inicio || inicio || "");
   const [turmaFim, setTurmaFim] = useState(turma?.fim || fim || "");
   const [tipo, setTipo] = useState(mode || "turmas");
 
   useEffect(() => {
-    if (dia && inicio && fim) {
+    if (data && moment(data).isValid()) {
+      console.log("AddTurmaScreen: Data recebida do Calendario:", data);
+      setTurmaDia(moment(data).format("dddd").toLowerCase());
+    } else if (dia && inicio && fim) {
       console.log("AddTurmaScreen: Preenchendo com horário disponível:", {
         dia,
         inicio,
@@ -33,7 +43,19 @@ export default function AddTurmaScreen({ route, navigation }) {
       setTurmaInicio(inicio);
       setTurmaFim(fim);
     }
-  }, [dia, inicio, fim]);
+  }, [dia, inicio, fim, data]);
+
+  const salvarReservaNoFirestore = async (reserva) => {
+    try {
+      const reservasRef = collection(db, "reservas");
+      const docRef = await addDoc(reservasRef, reserva);
+      console.log("Reserva salva no Firestore com ID:", docRef.id, reserva);
+      return docRef.id;
+    } catch (error) {
+      console.error("Erro ao salvar reserva no Firestore:", error);
+      throw error;
+    }
+  };
 
   const handleSave = async () => {
     if (
@@ -48,24 +70,22 @@ export default function AddTurmaScreen({ route, navigation }) {
       return;
     }
 
-    const novaTurmaOuAula = Object.assign(
-      {},
-      {
-        campoId: campoId,
-        nome: nome,
-        responsavel: responsavel,
-        telefone: telefone,
-        dia: turmaDia.toLowerCase(),
-        inicio: turmaInicio,
-        fim: turmaFim,
-        createdAt: turma?.createdAt || new Date().toISOString(),
-      }
-    );
+    if (!campoId) {
+      Alert.alert("Erro", "Nenhum campo selecionado para a reserva!");
+      return;
+    }
 
-    console.log("AddTurmaScreen: Tentando salvar:", novaTurmaOuAula);
-    console.log("AddTurmaScreen: Modo selecionado (tipo):", tipo);
+    const novaTurmaOuAula = {
+      campoId: campoId,
+      nome: nome,
+      responsavel: responsavel,
+      telefone: telefone,
+      dia: turmaDia.toLowerCase(),
+      inicio: turmaInicio,
+      fim: turmaFim,
+      createdAt: turma?.createdAt || new Date().toISOString(),
+    };
 
-    // Buscar turmas e aulas existentes
     const turmasExistentes = await turmaService.getTurmas();
     const aulasExistentes = await escolinhaService.getAulas();
     const todosHorarios = [...turmasExistentes, ...aulasExistentes]
@@ -73,29 +93,11 @@ export default function AddTurmaScreen({ route, navigation }) {
         ...item,
         dia: item.dia.toLowerCase(),
       }))
-      .filter((item) => {
-        const matchesDay = item.dia === novaTurmaOuAula.dia;
-        if (!matchesDay) {
-          console.log("Item filtrado (dia diferente):", item);
-        }
-        return matchesDay;
-      });
+      .filter((item) => item.dia === novaTurmaOuAula.dia);
 
-    console.log(
-      "AddTurmaScreen: Horários filtrados para o dia",
-      novaTurmaOuAula.dia,
-      ":",
-      todosHorarios
-    );
-
-    // Verificar conflitos apenas no mesmo dia
     const conflito = todosHorarios.some((item) => {
       if (turma && item.id === turma.id) return false;
-      const conflitoDetectado = checkHorarioConflito(item, novaTurmaOuAula);
-      if (conflitoDetectado) {
-        console.log("Conflito encontrado com:", item);
-      }
-      return conflitoDetectado;
+      return checkHorarioConflito(item, novaTurmaOuAula);
     });
 
     if (conflito) {
@@ -107,38 +109,37 @@ export default function AddTurmaScreen({ route, navigation }) {
     }
 
     try {
-      if (tipo === "turmas") {
-        console.log("AddTurmaScreen: Salvando como turma");
+      if (data && moment(data).isValid()) {
+        const reserva = {
+          data: moment(data).format("YYYY-MM-DD"),
+          horarioInicio: turmaInicio,
+          horarioFim: turmaFim,
+          nome: nome,
+          tipo: "avulsa",
+          campoId: campoId,
+          responsavel: responsavel,
+          telefone: telefone,
+        };
+        await salvarReservaNoFirestore(reserva);
+        console.log("AddTurmaScreen: Reserva avulsa salva com sucesso");
+      } else if (tipo === "turmas") {
         if (turma?.id) {
           await turmaService.updateTurma(turma.id, novaTurmaOuAula);
-          console.log("AddTurmaScreen: Turma atualizada com sucesso");
         } else {
           await turmaService.addTurma(novaTurmaOuAula);
-          console.log("AddTurmaScreen: Turma adicionada com sucesso");
         }
       } else {
-        console.log("AddTurmaScreen: Salvando como aula (escolinha)");
         if (turma?.id) {
           await escolinhaService.updateAula(turma.id, novaTurmaOuAula);
-          console.log("AddTurmaScreen: Aula atualizada com sucesso");
         } else {
-          const novaAula = await escolinhaService.addAula(novaTurmaOuAula);
-          console.log("AddTurmaScreen: Aula adicionada com sucesso:", novaAula);
+          await escolinhaService.addAula(novaTurmaOuAula);
         }
       }
-      console.log("AddTurmaScreen: Navegando de volta após salvar");
       navigation.goBack();
     } catch (error) {
-      console.error(
-        `AddTurmaScreen: Erro ao salvar ${
-          tipo === "turmas" ? "turma" : "aula"
-        }:`,
-        error
-      );
-      Alert.alert(
-        "Erro",
-        `Erro ao salvar a ${tipo === "turmas" ? "turma" : "aula"}.`
-      );
+      console.error("Erro ao salvar:", error);
+      Alert.alert("Erro", "Erro ao salvar a reserva/turma/aula.");
+      return;
     }
   };
 

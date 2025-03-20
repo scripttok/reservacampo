@@ -22,11 +22,25 @@ export const campoService = {
     return docRef.id;
   },
   async getCampos() {
-    console.log("campoService: Buscando campos");
-    const querySnapshot = await getDocs(collection(db, CAMPOS_COLLECTION));
-    const campos = querySnapshot.docs.map((doc) => Campo.fromFirestore(doc));
-    console.log("campoService: Campos encontrados:", campos.length);
-    return campos;
+    console.log("campoService: Iniciando busca de campos");
+    try {
+      const camposRef = collection(db, CAMPOS_COLLECTION);
+      const querySnapshot = await getDocs(camposRef);
+      console.log(
+        "campoService: Documentos brutos encontrados:",
+        querySnapshot.docs.length
+      );
+      const campos = querySnapshot.docs.map((doc) => {
+        const campo = Campo.fromFirestore(doc);
+        console.log("campoService: Campo processado:", campo);
+        return campo;
+      });
+      console.log("campoService: Campos processados:", campos);
+      return campos;
+    } catch (error) {
+      console.error("campoService: Erro ao buscar campos:", error);
+      return [];
+    }
   },
   async updateCampo(id, nome) {
     console.log("campoService: Atualizando campo:", id, nome);

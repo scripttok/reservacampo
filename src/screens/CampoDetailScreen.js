@@ -9,11 +9,16 @@ import {
   FlatList,
   Animated,
 } from "react-native";
+import moment from "moment";
+import "moment/locale/pt-br"; // Importa o locale português
 import { turmaService } from "../services/turmaService";
 import { escolinhaService } from "../services/escolinhaService";
 import { configService } from "../services/configService";
 import { db } from "../services/firebaseService";
 import { collection, query, where, getDocs } from "firebase/firestore";
+
+// Configura o locale para português
+moment.locale("pt-br");
 
 export default function CampoDetailScreen({ route, navigation }) {
   const {
@@ -25,6 +30,7 @@ export default function CampoDetailScreen({ route, navigation }) {
   } = route.params || {};
   const [turmasDoCampo, setTurmasDoCampo] = useState(initialTurmas || []);
   const [aulasDoCampo, setAulasDoCampo] = useState([]);
+  const [reservasDoFirestore, setReservasDoFirestore] = useState([]);
   const [horarioFuncionamento, setHorarioFuncionamento] = useState({
     inicio: "09:00",
     fim: "23:00",
@@ -46,35 +52,26 @@ export default function CampoDetailScreen({ route, navigation }) {
 
   useEffect(() => {
     const fetchData = async () => {
-      const reservasDoDia = await buscarReservasDoFirestore(
-        campo.id,
-        diaSelecionado
-      );
-      console.log("Reservas do dia:", reservasDoDia);
-      // Atualize o estado com as reservas encontradas
-    };
-    fetchData();
-  }, [diaSelecionado]);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      console.log(
-        "CampoDetailScreen: Buscando dados para o campo:",
-        campo.nome,
-        "Modo:",
-        mode
-      );
       const updatedTurmas = await turmaService.getTurmas();
       const updatedAulas = await escolinhaService.getAulas();
       const horario = await configService.getHorarioFuncionamento();
+      const reservas = await buscarReservasDoFirestore(campo.id);
 
       const turmasFiltradas = updatedTurmas.filter(
         (t) => t.campoId === campo.id
       );
       const aulasFiltradas = updatedAulas.filter((a) => a.campoId === campo.id);
+      const reservasFiltradas = reservas.filter((r) =>
+        moment(r.data).isSame(moment(), "week")
+      );
+
+      console.log("CampoDetailScreen: Turmas filtradas:", turmasFiltradas);
+      console.log("CampoDetailScreen: Aulas filtradas:", aulasFiltradas);
+      console.log("CampoDetailScreen: Reservas filtradas:", reservasFiltradas);
 
       setTurmasDoCampo(turmasFiltradas);
       setAulasDoCampo(aulasFiltradas);
+      setReservasDoFirestore(reservasFiltradas);
       setHorarioFuncionamento(horario);
     };
 
@@ -83,12 +80,56 @@ export default function CampoDetailScreen({ route, navigation }) {
     return () => unsubscribe();
   }, [navigation, campo.id, mode]);
 
+  const buscarReservasDoFirestore = async (campoId) => {
+    try {
+      const reservasRef = collection(db, "reservas");
+      const q = query(reservasRef, where("campoId", "==", campoId));
+      const querySnapshot = await getDocs(q);
+      const reservas = [];
+      querySnapshot.forEach((doc) => {
+        reservas.push({ id: doc.id, ...doc.data() });
+      });
+      console.log("CampoDetailScreen: Reservas do dia carregadas:", reservas);
+      return reservas;
+    } catch (error) {
+      console.error("Erro ao buscar reservas do Firestore:", error);
+      return [];
+    }
+  };
+
   const itensDoDia = [
     ...turmasDoCampo.filter(
       (item) => item.dia && item.dia.toLowerCase() === diaSelecionado
     ),
-    ...reservasDoFirestore, // Adicione as reservas do Firestore
-  ].sort((a, b) => a.horarioInicio.localeCompare(b.horarioInicio));
+    ...aulasDoCampo.filter(
+      (item) => item.dia && item.dia.toLowerCase() === diaSelecionado
+    ),
+    ...reservasDoFirestore
+      .filter((reserva) => {
+        const diaReserva = moment(reserva.data)
+          .format("dddd")
+          .toLowerCase()
+          .replace("-feira", ""); // Remove o sufixo "-feira"
+        const isSameWeek = moment(reserva.data).isSame(moment(), "week");
+        const matchesDay = diaReserva === diaSelecionado;
+        console.log(
+          `CampoDetailScreen: Filtrando reserva ${reserva.id} - Data: ${reserva.data}, Dia: ${diaReserva}, Semana Atual: ${isSameWeek}, Dia Selecionado: ${diaSelecionado}, Matches: ${matchesDay}`
+        );
+        return matchesDay && isSameWeek;
+      })
+      .map((reserva) => ({
+        ...reserva,
+        inicio: reserva.horarioInicio,
+        fim: reserva.horarioFim,
+      })),
+  ].sort(
+    (a, b) =>
+      a.inicio?.localeCompare(b.inicio) ||
+      a.horarioInicio?.localeCompare(b.horarioInicio)
+  );
+
+  console.log("CampoDetailScreen: Itens do dia para renderizar:", itensDoDia);
+
   const calcularHorariosDisponiveis = (inicio, fim, itensOcupados) => {
     const horarios = [];
     let currentTime = parseTime(inicio);
@@ -133,26 +174,6 @@ export default function CampoDetailScreen({ route, navigation }) {
     return start1 < end2 && start2 < end1;
   };
 
-  const buscarReservasDoFirestore = async (campoId, diaSelecionado) => {
-    try {
-      const reservasRef = collection(db, "reservas");
-      const q = query(
-        reservasRef,
-        where("campoId", "==", campoId),
-        where("data", "==", moment(diaSelecionado).format("YYYY-MM-DD"))
-      );
-      const querySnapshot = await getDocs(q);
-      const reservas = [];
-      querySnapshot.forEach((doc) => {
-        reservas.push(doc.data());
-      });
-      return reservas;
-    } catch (error) {
-      console.error("Erro ao buscar reservas do Firestore:", error);
-      return [];
-    }
-  };
-
   useEffect(() => {
     const itensOcupados = [
       ...turmasDoCampo.filter(
@@ -161,9 +182,22 @@ export default function CampoDetailScreen({ route, navigation }) {
       ...aulasDoCampo.filter(
         (item) => item.dia && item.dia.toLowerCase() === diaSelecionado
       ),
+      ...reservasDoFirestore
+        .filter(
+          (reserva) =>
+            moment(reserva.data)
+              .format("dddd")
+              .toLowerCase()
+              .replace("-feira", "") === diaSelecionado &&
+            moment(reserva.data).isSame(moment(), "week")
+        )
+        .map((reserva) => ({
+          inicio: reserva.horarioInicio,
+          fim: reserva.horarioFim,
+        })),
     ].map((item) => ({
-      inicio: item.inicio,
-      fim: item.fim,
+      inicio: item.inicio || item.horarioInicio,
+      fim: item.fim || item.horarioFim,
     }));
 
     const horariosLivres = calcularHorariosDisponiveis(
@@ -172,7 +206,13 @@ export default function CampoDetailScreen({ route, navigation }) {
       itensOcupados
     );
     setHorariosDisponiveis(horariosLivres);
-  }, [turmasDoCampo, aulasDoCampo, diaSelecionado, horarioFuncionamento]);
+  }, [
+    turmasDoCampo,
+    aulasDoCampo,
+    reservasDoFirestore,
+    diaSelecionado,
+    horarioFuncionamento,
+  ]);
 
   const formatarDataCriacao = (createdAt) => {
     if (!createdAt) return "Data não disponível";
@@ -184,7 +224,6 @@ export default function CampoDetailScreen({ route, navigation }) {
     });
   };
 
-  // Funções específicas para o modo "turmas"
   const calcularProximoPagamento = (createdAt) => {
     if (!createdAt) return "Indefinido";
     const dataCriacao = new Date(createdAt);
@@ -198,7 +237,7 @@ export default function CampoDetailScreen({ route, navigation }) {
   };
 
   const isTurmaEmAtraso = (createdAt) => {
-    if (mode !== "turmas" || !createdAt) return false; // Só aplica no modo "turmas"
+    if (mode !== "turmas" || !createdAt) return false;
     const dataCriacao = new Date(createdAt);
     const proximoPagamento = new Date(dataCriacao);
     proximoPagamento.setDate(dataCriacao.getDate() + 30);
@@ -210,7 +249,6 @@ export default function CampoDetailScreen({ route, navigation }) {
 
   useEffect(() => {
     if (mode === "turmas") {
-      // Só ativa a animação no modo "turmas"
       Animated.loop(
         Animated.sequence([
           Animated.timing(blinkAnim, {
@@ -304,7 +342,6 @@ export default function CampoDetailScreen({ route, navigation }) {
           {campo.nome} ({mode === "turmas" ? "Turmas" : "Escolinha"})
         </Text>
       </View>
-
       <FlatList
         data={diasDaSemana}
         renderItem={renderDiaButton}
@@ -325,12 +362,13 @@ export default function CampoDetailScreen({ route, navigation }) {
           <Text style={styles.noHorarioText}>Nenhum horário disponível</Text>
         }
       />
-
       <View style={styles.turmasContainer}>
         {itensDoDia.length > 0 ? (
           itensDoDia.map((item) => {
             const emAtraso =
-              mode === "turmas" ? isTurmaEmAtraso(item.createdAt) : false; // Atraso só para "turmas"
+              mode === "turmas" && item.createdAt
+                ? isTurmaEmAtraso(item.createdAt)
+                : false;
             return (
               <Animated.View
                 key={item.id}
@@ -340,11 +378,11 @@ export default function CampoDetailScreen({ route, navigation }) {
                     backgroundColor: "#FF0000",
                     opacity: blinkAnim,
                   },
-                  item.id === itemId && styles.turmaCardDestacada,
                 ]}
               >
                 <Text style={[styles.turmaTime, emAtraso && styles.textWhite]}>
-                  {item.inicio} - {item.fim}
+                  {item.inicio || item.horarioInicio} -{" "}
+                  {item.fim || item.horarioFim}
                 </Text>
                 <Text style={[styles.turmaName, emAtraso && styles.textWhite]}>
                   {item.nome}
@@ -352,25 +390,33 @@ export default function CampoDetailScreen({ route, navigation }) {
                 <Text
                   style={[styles.turmaDetail, emAtraso && styles.textWhite]}
                 >
-                  Responsável: {item.responsavel}
+                  Responsável: {item.responsavel || "N/A"}
                 </Text>
                 <Text
                   style={[styles.turmaDetail, emAtraso && styles.textWhite]}
                 >
-                  Telefone: {item.telefone}
+                  Telefone: {item.telefone || "N/A"}
                 </Text>
-                <Text
-                  style={[styles.turmaDetail, emAtraso && styles.textWhite]}
-                >
-                  Criado em: {formatarDataCriacao(item.createdAt)}
-                </Text>
-                {/* Exibir "Próximo pagamento" apenas para "turmas" */}
-                {mode === "turmas" && (
+                {item.createdAt && (
+                  <Text
+                    style={[styles.turmaDetail, emAtraso && styles.textWhite]}
+                  >
+                    Criado em: {formatarDataCriacao(item.createdAt)}
+                  </Text>
+                )}
+                {mode === "turmas" && item.createdAt && (
                   <Text
                     style={[styles.turmaDetail, emAtraso && styles.textWhite]}
                   >
                     Próximo pagamento:{" "}
                     {calcularProximoPagamento(item.createdAt)}
+                  </Text>
+                )}
+                {item.data && (
+                  <Text
+                    style={[styles.turmaDetail, emAtraso && styles.textWhite]}
+                  >
+                    Data: {moment(item.data).format("DD/MM/YYYY")}
                   </Text>
                 )}
                 <View style={styles.actions}>
@@ -491,7 +537,7 @@ const styles = StyleSheet.create({
   },
   turmaCardDestacada: {
     borderWidth: 2,
-    borderColor: "#ffcc00", // Destaque amarelo para o item clicado
+    borderColor: "#ffcc00",
   },
   turmaTime: {
     fontSize: 18,
