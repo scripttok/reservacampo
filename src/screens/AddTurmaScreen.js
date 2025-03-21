@@ -14,7 +14,7 @@ import { checkHorarioConflito } from "../utils/horarioUtils";
 import { db } from "../services/firebaseService";
 import { collection, addDoc } from "firebase/firestore";
 import moment from "moment";
-import "moment/locale/pt-br"; // Importa o locale português
+import "moment/locale/pt-br";
 
 moment.locale("pt-br");
 
@@ -28,6 +28,7 @@ export default function AddTurmaScreen({ route, navigation }) {
     mode,
     data,
     tipo: tipoParam,
+    reservasExistentes = [], // Recebe reservas existentes do CalendarioScreen
   } = route.params || {};
   const [nome, setNome] = useState(turma?.nome || "");
   const [responsavel, setResponsavel] = useState(turma?.responsavel || "");
@@ -71,6 +72,20 @@ export default function AddTurmaScreen({ route, navigation }) {
     }
   };
 
+  const hasTimeConflict = (inicio, fim, reservas) => {
+    const newStart = moment(inicio, "HH:mm");
+    const newEnd = moment(fim, "HH:mm");
+
+    return reservas.some((reserva) => {
+      const existingStart = moment(
+        reserva.inicio || reserva.horarioInicio,
+        "HH:mm"
+      );
+      const existingEnd = moment(reserva.fim || reserva.horarioFim, "HH:mm");
+      return newStart.isBefore(existingEnd) && newEnd.isAfter(existingStart);
+    });
+  };
+
   const handleSave = async () => {
     if (
       !nome ||
@@ -89,6 +104,18 @@ export default function AddTurmaScreen({ route, navigation }) {
       return;
     }
 
+    // Validar formato de horário
+    if (
+      !moment(turmaInicio, "HH:mm", true).isValid() ||
+      !moment(turmaFim, "HH:mm", true).isValid()
+    ) {
+      Alert.alert(
+        "Erro",
+        "Horários devem estar no formato HH:mm (ex.: 17:00)!"
+      );
+      return;
+    }
+
     const novaTurmaOuAula = {
       campoId: campoId,
       nome: nome,
@@ -100,60 +127,73 @@ export default function AddTurmaScreen({ route, navigation }) {
       createdAt: turma?.createdAt || new Date().toISOString(),
     };
 
-    const turmasExistentes = await turmaService.getTurmas();
-    const aulasExistentes = await escolinhaService.getAulas();
-    const todosHorarios = [...turmasExistentes, ...aulasExistentes]
-      .map((item) => ({
-        ...item,
-        dia: item.dia.toLowerCase(),
-      }))
-      .filter((item) => item.dia === novaTurmaOuAula.dia);
-
-    const conflito = todosHorarios.some((item) => {
-      if (turma && item.id === turma.id) return false;
-      return checkHorarioConflito(item, novaTurmaOuAula);
-    });
-
-    if (conflito) {
-      Alert.alert(
-        "Conflito de Horário",
-        "Este horário já está ocupado por outra turma ou aula!"
-      );
-      return;
-    }
-
     try {
       if (data && moment(data).isValid()) {
+        // Modo reserva mensal vindo do calendário
         const reserva = {
           data: moment(data).format("YYYY-MM-DD"),
           horarioInicio: turmaInicio,
           horarioFim: turmaFim,
           nome: nome,
-          tipo: "mensal", // Alterado para "mensal"
+          tipo: "mensal",
           campoId: campoId,
           responsavel: responsavel,
           telefone: telefone,
         };
+
+        // Verificar conflitos com reservas existentes
+        if (hasTimeConflict(turmaInicio, turmaFim, reservasExistentes)) {
+          Alert.alert(
+            "Conflito de Horário",
+            "Este horário já está ocupado por outra reserva no dia selecionado!"
+          );
+          return;
+        }
+
         await salvarReservaNoFirestore(reserva);
         console.log("AddTurmaScreen: Reserva mensal salva com sucesso");
-      } else if (tipo === "turmas") {
-        if (turma?.id) {
-          await turmaService.updateTurma(turma.id, novaTurmaOuAula);
-        } else {
-          await turmaService.addTurma(novaTurmaOuAula);
-        }
       } else {
-        if (turma?.id) {
-          await escolinhaService.updateAula(turma.id, novaTurmaOuAula);
+        // Modo turmas ou escolinha
+        const turmasExistentes = await turmaService.getTurmas();
+        const aulasExistentes = await escolinhaService.getAulas();
+        const todosHorarios = [...turmasExistentes, ...aulasExistentes]
+          .map((item) => ({
+            ...item,
+            dia: item.dia.toLowerCase(),
+          }))
+          .filter((item) => item.dia === novaTurmaOuAula.dia);
+
+        const conflito = todosHorarios.some((item) => {
+          if (turma && item.id === turma.id) return false;
+          return checkHorarioConflito(item, novaTurmaOuAula);
+        });
+
+        if (conflito) {
+          Alert.alert(
+            "Conflito de Horário",
+            "Este horário já está ocupado por outra turma ou aula!"
+          );
+          return;
+        }
+
+        if (tipo === "turmas") {
+          if (turma?.id) {
+            await turmaService.updateTurma(turma.id, novaTurmaOuAula);
+          } else {
+            await turmaService.addTurma(novaTurmaOuAula);
+          }
         } else {
-          await escolinhaService.addAula(novaTurmaOuAula);
+          if (turma?.id) {
+            await escolinhaService.updateAula(turma.id, novaTurmaOuAula);
+          } else {
+            await escolinhaService.addAula(novaTurmaOuAula);
+          }
         }
       }
       navigation.goBack();
     } catch (error) {
       console.error("Erro ao salvar:", error);
       Alert.alert("Erro", "Erro ao salvar a reserva/turma/aula.");
-      return;
     }
   };
 
@@ -206,6 +246,7 @@ export default function AddTurmaScreen({ route, navigation }) {
         placeholder="Dia (ex.: segunda)"
         value={turmaDia}
         onChangeText={setTurmaDia}
+        editable={!data} // Bloqueia edição do dia se vier do calendário
       />
       <TextInput
         style={styles.input}
