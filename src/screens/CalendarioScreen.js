@@ -162,9 +162,12 @@ export default function CalendarioScreen({ navigation }) {
         if (reserva.tipo === "mensal") {
           const diaSemana = dataInicial.day();
           const startOfPeriod = dataInicial.clone().startOf("day");
-          const endOfPeriod = dataInicial.clone().add(30, "days");
+          const endOfPeriod = dataInicial
+            .clone()
+            .add(1, "month")
+            .startOf("day");
           let currentDate = startOfPeriod.clone();
-          while (currentDate <= endOfPeriod) {
+          while (currentDate.isSameOrBefore(endOfPeriod)) {
             if (currentDate.day() === diaSemana) {
               const mensalDateStr = currentDate.format("YYYY-MM-DD");
               marked[mensalDateStr] = {
@@ -207,7 +210,14 @@ export default function CalendarioScreen({ navigation }) {
         const reservaDate = moment(reserva.data);
         const isSameDate = reservaDate.format("YYYY-MM-DD") === date;
         const isMensal =
-          reserva.tipo === "mensal" && reservaDate.day() === moment(date).day();
+          reserva.tipo === "mensal" &&
+          reservaDate.day() === moment(date).day() &&
+          moment(date).isBetween(
+            reservaDate,
+            reservaDate.clone().add(1, "month"),
+            null,
+            "[]"
+          );
         return isSameDate || isMensal;
       });
 
@@ -566,6 +576,14 @@ export default function CalendarioScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <Text style={styles.label}>Selecione um Campo:</Text>
+      <View style={styles.legendContainer}>
+        <Text style={[styles.legendText, { color: "#FFA500" }]}>
+          ■ Aluguéis Avulsos
+        </Text>
+        <Text style={[styles.legendText, { color: "#28A745" }]}>
+          ■ Aluguéis Mensais
+        </Text>
+      </View>
       <Picker
         selectedValue={selectedCampoId}
         onValueChange={(itemValue) => setSelectedCampoId(itemValue)}
@@ -614,14 +632,6 @@ export default function CalendarioScreen({ navigation }) {
           todayTextColor: "#007AFF",
         }}
       />
-      <View style={styles.legendContainer}>
-        <Text style={[styles.legendText, { color: "#FFA500" }]}>
-          ■ Aluguéis Avulsos
-        </Text>
-        <Text style={[styles.legendText, { color: "#28A745" }]}>
-          ■ Aluguéis Mensais
-        </Text>
-      </View>
       {/* Modal de Reservas do Dia */}
       <Modal
         animationType="slide"
@@ -846,7 +856,9 @@ export default function CalendarioScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20, backgroundColor: "#fff" },
-  label: { fontSize: 16, fontWeight: "bold", marginBottom: 10, color: "#333" },
+  label: { fontSize: 16, fontWeight: "bold", marginBottom: 5, color: "#333" },
+  legendContainer: { marginBottom: 10 },
+  legendText: { fontSize: 14, marginBottom: 2 },
   picker: {
     height: 50,
     width: "100%",

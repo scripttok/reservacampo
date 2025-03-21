@@ -9,13 +9,18 @@ import {
   Modal,
   TextInput,
   Animated,
+  Alert,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage"; // Adicionado
 import { campoService } from "../services/campoService";
 import { turmaService } from "../services/turmaService";
 import { escolinhaService } from "../services/escolinhaService";
 import { alunoService } from "../services/alunoService";
 import { configService } from "../services/configService";
 import { paymentService } from "../services/paymentService";
+import { db } from "../services/firebaseService"; // Adicionado para buscar reservas
+import { collection, query, getDocs } from "firebase/firestore"; // Adicionado
+import moment from "moment"; // Adicionado para manipulação de datas
 import Campo from "../components/Campo";
 import { DrawerActions } from "@react-navigation/native";
 
@@ -68,6 +73,9 @@ export default function HomeScreen({ navigation, route }) {
         );
         console.log("HomeScreen: Item em atraso encontrado:", atraso);
         setAtrasoItem(atraso);
+
+        // Verificar aluguéis mensais próximos do vencimento
+        await checkMonthlyRentalsExpiration();
       } catch (error) {
         console.error("HomeScreen: Erro ao carregar dados:", error);
       } finally {
@@ -106,6 +114,91 @@ export default function HomeScreen({ navigation, route }) {
     if (openConfigModal) setConfigModalVisible(true);
   }, [navigation, mode]);
 
+  const fetchReservasMensais = async () => {
+    try {
+      console.log("HomeScreen: Buscando reservas mensais");
+      const reservasRef = collection(db, "reservas");
+      const q = query(reservasRef);
+      const querySnapshot = await getDocs(q);
+      const reservasData = [];
+      querySnapshot.forEach((doc) => {
+        reservasData.push({ id: doc.id, ...doc.data() });
+      });
+      const mensais = reservasData.filter(
+        (reserva) => reserva.tipo === "mensal"
+      );
+      console.log("HomeScreen: Reservas mensais encontradas:", mensais);
+      return mensais;
+    } catch (error) {
+      console.error("Erro ao buscar reservas mensais do Firestore:", error);
+      return [];
+    }
+  };
+
+  const checkMonthlyRentalsExpiration = async () => {
+    console.log("HomeScreen: Verificando vencimento de aluguéis mensais");
+    const reservasMensais = await fetchReservasMensais();
+    const today = moment(); // Data atual do sistema
+    const todayStr = today.format("YYYY-MM-DD");
+    console.log("HomeScreen: Data atual:", todayStr);
+
+    for (const reserva of reservasMensais) {
+      const dataInicial = moment(reserva.data);
+      const dataVencimento = dataInicial.clone().add(1, "month");
+      const startOfLastWeek = dataVencimento
+        .clone()
+        .startOf("week")
+        .add(1, "day"); // Segunda-feira
+
+      console.log(
+        `HomeScreen: Reserva "${reserva.nome}", início: ${dataInicial.format(
+          "DD/MM/YYYY"
+        )}, vencimento: ${dataVencimento.format(
+          "DD/MM/YYYY"
+        )}, início última semana: ${startOfLastWeek.format("DD/MM/YYYY")}`
+      );
+
+      if (
+        today.isBetween(startOfLastWeek, dataVencimento, null, "[]") &&
+        today.isSameOrBefore(dataVencimento)
+      ) {
+        const lastAlertKey = `lastAlert_${reserva.id}`;
+        const lastAlertDate = await AsyncStorage.getItem(lastAlertKey);
+        const lastAlertMoment = lastAlertDate ? moment(lastAlertDate) : null;
+
+        console.log(
+          `HomeScreen: Reserva "${
+            reserva.nome
+          }" na última semana. Último alerta: ${lastAlertDate || "nenhum"}`
+        );
+
+        if (!lastAlertMoment || !lastAlertMoment.isSame(today, "day")) {
+          Alert.alert(
+            "Aluguel Mensal Prestes a Vencer",
+            `O aluguel mensal "${
+              reserva.nome
+            }" vence em ${dataVencimento.format(
+              "DD/MM/YYYY"
+            )} (${dataVencimento.fromNow()}).`,
+            [{ text: "OK", onPress: () => console.log("Alerta confirmado") }]
+          );
+          await AsyncStorage.setItem(lastAlertKey, todayStr);
+          console.log(
+            `HomeScreen: Alerta exibido para "${reserva.nome}", salvo em ${lastAlertKey}`
+          );
+        } else {
+          console.log(
+            `HomeScreen: Alerta para "${reserva.nome}" já exibido hoje`
+          );
+        }
+      } else {
+        console.log(
+          `HomeScreen: Reserva "${reserva.nome}" fora da última semana`
+        );
+      }
+    }
+  };
+
   const checkPaymentStatus = (items, payments, currentMode) => {
     if (!payments || !Array.isArray(payments)) {
       console.log(
@@ -127,7 +220,6 @@ export default function HomeScreen({ navigation, route }) {
     );
 
     for (const item of items) {
-      // Verificação de segurança
       if (!item || !item.type || !item.createdAt) {
         console.log(
           "HomeScreen: Item inválido, faltando type ou createdAt:",
