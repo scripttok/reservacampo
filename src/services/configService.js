@@ -6,18 +6,14 @@ const CONFIG_COLLECTION = "configuracao";
 
 export const configService = {
   async setHorarioFuncionamento(inicio, fim) {
-    console.log(
-      "configService: Definindo horário de funcionamento:",
-      inicio,
-      fim
-    );
+    "configService: Definindo horário de funcionamento:", inicio, fim;
     const configRef = doc(db, CONFIG_COLLECTION, "horarioFuncionamento");
     await setDoc(configRef, { inicio, fim }, { merge: true });
-    console.log("configService: Horário de funcionamento salvo");
+    ("configService: Horário de funcionamento salvo");
   },
 
   async getHorarioFuncionamento() {
-    console.log("configService: Buscando horário de funcionamento");
+    ("configService: Buscando horário de funcionamento");
     const configRef = doc(db, CONFIG_COLLECTION, "horarioFuncionamento");
     const snapshot = await getDocs(collection(db, CONFIG_COLLECTION));
     let horario = { inicio: "09:00", fim: "23:00" }; // Padrão inicial
@@ -26,7 +22,7 @@ export const configService = {
         horario = doc.data();
       }
     });
-    console.log("configService: Horário encontrado:", horario);
+    "configService: Horário encontrado:", horario;
     return horario;
   },
 };

@@ -53,7 +53,7 @@ export default function AlunosScreen({ navigation }) {
 
     // Listener de foco para recarregar ao voltar para a tela
     const unsubscribe = navigation.addListener("focus", () => {
-      console.log("AlunosScreen: Tela em foco, recarregando dados...");
+      ("AlunosScreen: Tela em foco, recarregando dados...");
       fetchData();
     });
 

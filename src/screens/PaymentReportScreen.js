@@ -32,13 +32,13 @@ export default function PaymentReportScreen({ navigation, route }) {
   const fetchData = async () => {
     try {
       const turmasData = await turmaService.getTurmas();
-      console.log("Turmas recebidas:", turmasData); // Corrigido para console.log
+      "Turmas recebidas:", turmasData; // Corrigido para
       const alunosData = await alunoService.getAlunos();
-      console.log("Alunos recebidos:", alunosData); // Corrigido para console.log
+      "Alunos recebidos:", alunosData; // Corrigido para
       const pricesData = await priceService.getPrices();
-      console.log("Preços recebidos:", pricesData); // Corrigido para console.log
+      "Preços recebidos:", pricesData; // Corrigido para
       const paymentsData = await paymentService.getPayments();
-      console.log("Pagamentos recebidos:", paymentsData); // Corrigido para console.log
+      "Pagamentos recebidos:", paymentsData; // Corrigido para
 
       setPrices(pricesData);
       setPayments(paymentsData);

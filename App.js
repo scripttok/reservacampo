@@ -47,7 +47,7 @@ function CustomDrawerContent(props) {
   const { navigation, setMode, mode } = props;
 
   const handleAddCampo = () => {
-    console.log("Drawer: Solicitando abertura do modal de adicionar campo");
+    ("Drawer: Solicitando abertura do modal de adicionar campo");
     const homeParams = navigation
       .getState()
       .routes.find((r) => r.name === "HomeStack")?.state?.routes[0]?.params;
@@ -55,7 +55,7 @@ function CustomDrawerContent(props) {
       homeParams.openAddModal();
       navigation.closeDrawer();
     } else {
-      console.log("Drawer: Navegando para Home com modal de adicionar campo");
+      ("Drawer: Navegando para Home com modal de adicionar campo");
       navigation.navigate("HomeStack", {
         screen: "Home",
         params: { openAddModal: true, mode },
@@ -65,7 +65,7 @@ function CustomDrawerContent(props) {
   };
 
   const handleConfigHorarios = () => {
-    console.log("Drawer: Solicitando abertura do modal de configurar horários");
+    ("Drawer: Solicitando abertura do modal de configurar horários");
     const homeParams = navigation
       .getState()
       .routes.find((r) => r.name === "HomeStack")?.state?.routes[0]?.params;

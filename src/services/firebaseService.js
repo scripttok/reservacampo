@@ -12,9 +12,9 @@ const firebaseConfig = {
   databaseURL: "https://projetocampo-3e349-default-rtdb.firebaseio.com",
 };
 
-console.log("firebaseService: Inicializando Firebase");
+("firebaseService: Inicializando Firebase");
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-console.log("firebaseService: Firebase inicializado com sucesso");
+("firebaseService: Firebase inicializado com sucesso");
 
 export { db };

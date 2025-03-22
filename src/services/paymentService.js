@@ -6,14 +6,14 @@ const PAYMENTS_COLLECTION = "payments";
 
 export const paymentService = {
   async getPayments() {
-    console.log("paymentService: Buscando pagamentos");
+    ("paymentService: Buscando pagamentos");
     try {
       const querySnapshot = await getDocs(collection(db, PAYMENTS_COLLECTION));
       const payments = querySnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
-      console.log("paymentService: Pagamentos encontrados:", payments.length);
+      "paymentService: Pagamentos encontrados:", payments.length;
       return payments;
     } catch (error) {
       console.error("paymentService: Erro ao buscar pagamentos:", error);
@@ -22,10 +22,10 @@ export const paymentService = {
   },
 
   async addPayment(payment) {
-    console.log("paymentService: Adicionando pagamento:", payment);
+    "paymentService: Adicionando pagamento:", payment;
     try {
       const docRef = await addDoc(collection(db, PAYMENTS_COLLECTION), payment);
-      console.log("paymentService: Pagamento adicionado com ID:", docRef.id);
+      "paymentService: Pagamento adicionado com ID:", docRef.id;
       return docRef.id;
     } catch (error) {
       console.error("paymentService: Erro ao adicionar pagamento:", error);

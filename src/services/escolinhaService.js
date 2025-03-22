@@ -13,24 +13,30 @@ const ESCOLINHA_COLLECTION = "escolinha";
 
 export const escolinhaService = {
   async getAulas() {
-    console.log("escolinhaService: Buscando aulas");
-    const aulasCol = collection(db, ESCOLINHA_COLLECTION);
-    const aulasSnapshot = await getDocs(aulasCol);
-    const aulasList = aulasSnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
-    console.log("escolinhaService: Aulas encontradas:", aulasList.length);
-    return aulasList;
+    try {
+      ("escolinhaService: Buscando aulas");
+      const aulasCol = collection(db, ESCOLINHA_COLLECTION);
+      const aulasSnapshot = await getDocs(aulasCol);
+      const aulasList = aulasSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      "escolinhaService: Aulas encontradas:", aulasList.length;
+      return aulasList;
+    } catch (error) {
+      console.error("escolinhaService: Erro ao buscar aulas:", error);
+      return [];
+    }
   },
 
   async addAula({ campoId, dia, inicio, fim, nome, responsavel, telefone }) {
-    console.log("escolinhaService: Adicionando aula:", {
-      campoId,
-      dia,
-      inicio,
-      fim,
-    });
+    "escolinhaService: Adicionando aula:",
+      {
+        campoId,
+        dia,
+        inicio,
+        fim,
+      };
     if (!dia) throw new Error("O campo 'dia' é obrigatório");
     const createdAt = new Date().toISOString();
     const aulaComData = {
@@ -49,16 +55,16 @@ export const escolinhaService = {
   },
 
   async updateAula(id, aulaAtualizada) {
-    console.log("escolinhaService: Atualizando aula:", id, aulaAtualizada);
+    "escolinhaService: Atualizando aula:", id, aulaAtualizada;
     const aulaRef = doc(db, ESCOLINHA_COLLECTION, id);
     await updateDoc(aulaRef, aulaAtualizada);
-    console.log("escolinhaService: Aula atualizada");
+    ("escolinhaService: Aula atualizada");
   },
 
   async deleteAula(id) {
-    console.log("escolinhaService: Deletando aula:", id);
+    "escolinhaService: Deletando aula:", id;
     const aulaRef = doc(db, ESCOLINHA_COLLECTION, id);
     await deleteDoc(aulaRef);
-    console.log("escolinhaService: Aula deletada");
+    ("escolinhaService: Aula deletada");
   },
 };

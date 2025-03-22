@@ -61,9 +61,9 @@ export default function CampoDetailScreen({ route, navigation }) {
       );
       const aulasFiltradas = updatedAulas.filter((a) => a.campoId === campo.id);
       // Não filtramos mais por semana aqui, pois reservas mensais se repetem
-      console.log("CampoDetailScreen: Turmas filtradas:", turmasFiltradas);
-      console.log("CampoDetailScreen: Aulas filtradas:", aulasFiltradas);
-      console.log("CampoDetailScreen: Reservas carregadas:", reservas);
+      "CampoDetailScreen: Turmas filtradas:", turmasFiltradas;
+      "CampoDetailScreen: Aulas filtradas:", aulasFiltradas;
+      "CampoDetailScreen: Reservas carregadas:", reservas;
 
       setTurmasDoCampo(turmasFiltradas);
       setAulasDoCampo(aulasFiltradas);
@@ -85,7 +85,7 @@ export default function CampoDetailScreen({ route, navigation }) {
       querySnapshot.forEach((doc) => {
         reservas.push({ id: doc.id, ...doc.data() });
       });
-      console.log("CampoDetailScreen: Reservas do dia carregadas:", reservas);
+      "CampoDetailScreen: Reservas do dia carregadas:", reservas;
       return reservas;
     } catch (error) {
       console.error("Erro ao buscar reservas do Firestore:", error);
@@ -110,13 +110,11 @@ export default function CampoDetailScreen({ route, navigation }) {
         const matchesDay = diaReserva === diaSelecionado;
         // Para reservas mensais, ignoramos a data específica e repetimos semanalmente
         const isMensal = reserva.tipo === "mensal";
-        console.log(
-          `CampoDetailScreen: Filtrando reserva ${reserva.id} - Data: ${
-            reserva.data
-          }, Dia: ${diaReserva}, Semana Atual: ${isSameWeek}, Dia Selecionado: ${diaSelecionado}, Tipo: ${
-            reserva.tipo
-          }, Matches: ${isMensal ? matchesDay : matchesDay && isSameWeek}`
-        );
+        `CampoDetailScreen: Filtrando reserva ${reserva.id} - Data: ${
+          reserva.data
+        }, Dia: ${diaReserva}, Semana Atual: ${isSameWeek}, Dia Selecionado: ${diaSelecionado}, Tipo: ${
+          reserva.tipo
+        }, Matches: ${isMensal ? matchesDay : matchesDay && isSameWeek}`;
         return isMensal ? matchesDay : matchesDay && isSameWeek;
       })
       .map((reserva) => ({
@@ -130,7 +128,7 @@ export default function CampoDetailScreen({ route, navigation }) {
       a.horarioInicio?.localeCompare(b.horarioInicio)
   );
 
-  console.log("CampoDetailScreen: Itens do dia para renderizar:", itensDoDia);
+  "CampoDetailScreen: Itens do dia para renderizar:", itensDoDia;
 
   const calcularHorariosDisponiveis = (inicio, fim, itensOcupados) => {
     const horarios = [];

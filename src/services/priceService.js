@@ -7,7 +7,7 @@ const PRICES_DOC_ID = "service_prices"; // Usaremos um documento fixo para simpl
 
 export const priceService = {
   async getPrices() {
-    console.log("priceService: Buscando preços");
+    ("priceService: Buscando preços");
     try {
       const pricesRef = doc(db, PRICES_COLLECTION, PRICES_DOC_ID);
       const pricesSnapshot = await getDocs(collection(db, PRICES_COLLECTION));
@@ -19,7 +19,7 @@ export const priceService = {
           prices = docData.data();
         }
       }
-      console.log("priceService: Preços encontrados:", prices);
+      "priceService: Preços encontrados:", prices;
       return prices;
     } catch (error) {
       console.error("priceService: Erro ao buscar preços:", error);
@@ -28,11 +28,11 @@ export const priceService = {
   },
 
   async setPrices(prices) {
-    console.log("priceService: Salvando preços:", prices);
+    "priceService: Salvando preços:", prices;
     try {
       const pricesRef = doc(db, PRICES_COLLECTION, PRICES_DOC_ID);
       await setDoc(pricesRef, prices, { merge: true }); // Usa merge para atualizar apenas os campos fornecidos
-      console.log("priceService: Preços salvos com sucesso");
+      ("priceService: Preços salvos com sucesso");
     } catch (error) {
       console.error("priceService: Erro ao salvar preços:", error);
       throw error;

@@ -1,5 +1,4 @@
-// src/screens/CalendarioScreen.js
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -9,6 +8,7 @@ import {
   FlatList,
   TextInput,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { Calendar, LocaleConfig } from "react-native-calendars";
 import { Picker } from "@react-native-picker/picker";
@@ -30,6 +30,7 @@ import {
 
 moment.locale("pt-br");
 
+// Configuração do calendário em português (mantida igual)
 LocaleConfig.locales["pt"] = {
   monthNames: [
     "Janeiro",
@@ -73,6 +74,8 @@ LocaleConfig.locales["pt"] = {
 LocaleConfig.defaultLocale = "pt";
 
 export default function CalendarioScreen({ navigation }) {
+  ("CalendarioScreen: Componente montado");
+
   const [selectedDate, setSelectedDate] = useState(
     moment().format("YYYY-MM-DD")
   );
@@ -85,6 +88,7 @@ export default function CalendarioScreen({ navigation }) {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [addAvulsoModalVisible, setAddAvulsoModalVisible] = useState(false);
   const [addRentalModalVisible, setAddRentalModalVisible] = useState(false);
+  const [addAulaModalVisible, setAddAulaModalVisible] = useState(false);
   const [reservasDoDia, setReservasDoDia] = useState([]);
   const [selectedReserva, setSelectedReserva] = useState(null);
   const [editNome, setEditNome] = useState("");
@@ -102,37 +106,18 @@ export default function CalendarioScreen({ navigation }) {
   const [rentalTelefone, setRentalTelefone] = useState("");
   const [rentalHorarioInicio, setRentalHorarioInicio] = useState("");
   const [rentalHorarioFim, setRentalHorarioFim] = useState("");
+  const [aulaNome, setAulaNome] = useState("");
+  const [aulaResponsavel, setAulaResponsavel] = useState("");
+  const [aulaTelefone, setAulaTelefone] = useState("");
+  const [aulaHorarioInicio, setAulaHorarioInicio] = useState("");
+  const [aulaHorarioFim, setAulaHorarioFim] = useState("");
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedRentalDates, setSelectedRentalDates] = useState({});
+  const [needsFetch, setNeedsFetch] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      console.log("CalendarioScreen: Iniciando busca de dados");
-      try {
-        const camposData = await campoService.getCampos();
-        setCampos(camposData);
-        if (camposData.length > 0) setSelectedCampoId(camposData[0].id);
-        const reservasData = await fetchReservas();
-        setReservas(reservasData);
-      } catch (error) {
-        console.error("CalendarioScreen: Erro ao buscar dados:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchData();
-
-    const unsubscribe = navigation.addListener("focus", fetchData);
-    return unsubscribe;
-  }, [navigation]);
-
-  useEffect(() => {
-    if (selectedCampoId && reservas.length > 0) {
-      updateMarkedDates(reservas, selectedDate);
-    }
-  }, [selectedCampoId, reservas, selectedDate]);
-
-  const fetchReservas = async () => {
+  const fetchReservas = useCallback(async () => {
+    ("CalendarioScreen: fetchReservas iniciado");
     try {
       const reservasRef = collection(db, "reservas");
       const q = query(reservasRef);
@@ -141,103 +126,221 @@ export default function CalendarioScreen({ navigation }) {
       querySnapshot.forEach((doc) => {
         reservasData.push({ id: doc.id, ...doc.data() });
       });
+      "CalendarioScreen: fetchReservas concluído, reservas:",
+        reservasData.length;
       return reservasData;
     } catch (error) {
-      console.error("Erro ao buscar reservas do Firestore:", error);
+      console.error("CalendarioScreen: Erro em fetchReservas:", error);
       return [];
     }
-  };
+  }, []);
 
-  const updateMarkedDates = (
-    reservasData,
-    selected,
-    rentalDates = selectedRentalDates
-  ) => {
-    const marked = {};
-    reservasData
-      .filter((reserva) => reserva.campoId === selectedCampoId)
-      .forEach((reserva) => {
-        const dataInicial = moment(reserva.data);
-        const dateStr = dataInicial.format("YYYY-MM-DD");
-        if (reserva.tipo === "mensal") {
-          const diaSemana = dataInicial.day();
-          const startOfPeriod = dataInicial.clone().startOf("day");
-          const endOfPeriod = dataInicial
-            .clone()
-            .add(1, "month")
-            .startOf("day");
-          let currentDate = startOfPeriod.clone();
-          while (currentDate.isSameOrBefore(endOfPeriod)) {
-            if (currentDate.day() === diaSemana) {
-              const mensalDateStr = currentDate.format("YYYY-MM-DD");
-              marked[mensalDateStr] = {
-                selected: true,
-                selectedColor: "#28A745",
-              };
-            }
-            currentDate.add(1, "week");
-          }
-        } else if (reserva.tipo === "avulso") {
-          marked[dateStr] = { selected: true, selectedColor: "#FFA500" };
-        }
-      });
-
-    Object.keys(rentalDates).forEach((date) => {
-      marked[date] = {
-        ...marked[date],
-        selected: true,
-        selectedColor: "#00FF00",
-      };
-    });
-
-    marked[selected] = {
-      ...marked[selected],
-      selected: true,
-      selectedColor: "#007AFF",
-    };
-    setMarkedDates(marked);
-  };
-
-  const fetchReservasDoDia = async (date) => {
+  const fetchData = useCallback(async () => {
+    "CalendarioScreen: fetchData chamado, needsFetch:", needsFetch;
+    if (!needsFetch) {
+      ("CalendarioScreen: fetchData ignorado, já buscado");
+      return;
+    }
+    ("CalendarioScreen: Iniciando busca de dados");
+    setIsLoading(true);
     try {
-      const diaSemana = moment(date)
-        .format("dddd")
-        .toLowerCase()
-        .replace("-feira", "");
-      const turmas = await turmaService.getTurmas();
-      const aulas = await escolinhaService.getAulas();
-      const reservasFirestore = reservas.filter((reserva) => {
-        const reservaDate = moment(reserva.data);
-        const isSameDate = reservaDate.format("YYYY-MM-DD") === date;
-        const isMensal =
-          reserva.tipo === "mensal" &&
-          reservaDate.day() === moment(date).day() &&
-          moment(date).isBetween(
-            reservaDate,
-            reservaDate.clone().add(1, "month"),
-            null,
-            "[]"
-          );
-        return isSameDate || isMensal;
+      const camposData = await campoService.getCampos();
+      "CalendarioScreen: Campos carregados:", camposData;
+      setCampos(camposData);
+      const reservasData = await fetchReservas();
+      "CalendarioScreen: Reservas carregadas:", reservasData;
+      setReservas(reservasData);
+      if (camposData.length > 0 && !selectedCampoId) {
+        "CalendarioScreen: Definindo selectedCampoId inicial:",
+          camposData[0].id;
+        setSelectedCampoId(camposData[0].id);
+      }
+      setIsLoading(false); // Mova setIsLoading(false) para antes de setNeedsFetch
+      setNeedsFetch(false); // Garanta que isso só aconteça no sucesso
+      ("CalendarioScreen: fetchData concluído");
+    } catch (error) {
+      console.error("CalendarioScreen: Erro ao buscar dados:", error);
+      setIsLoading(false);
+    }
+  }, [fetchReservas, selectedCampoId, needsFetch]);
+
+  useEffect(() => {
+    ("CalendarioScreen: Primeiro useEffect disparado");
+    fetchData();
+  }, [fetchData]);
+
+  const generateMarkedDates = useMemo(() => {
+    return (reservasData, selected, rentalDates) => {
+      "CalendarioScreen: generateMarkedDates chamado com reservas:",
+        reservasData.length,
+        "selected:",
+        selected,
+        "rentalDates:",
+        Object.keys(rentalDates);
+      const marked = {};
+      reservasData
+        .filter((reserva) => reserva.campoId === selectedCampoId)
+        .forEach((reserva) => {
+          const dataInicial = moment(reserva.data);
+          const dateStr = dataInicial.format("YYYY-MM-DD");
+          if (reserva.tipo === "mensal") {
+            const diaSemana = dataInicial.day();
+            const startOfPeriod = dataInicial.clone().startOf("day");
+            const endOfPeriod = dataInicial
+              .clone()
+              .add(1, "month")
+              .startOf("day");
+            let currentDate = startOfPeriod.clone();
+            while (currentDate.isSameOrBefore(endOfPeriod)) {
+              if (currentDate.day() === diaSemana) {
+                const mensalDateStr = currentDate.format("YYYY-MM-DD");
+                marked[mensalDateStr] = {
+                  selected: true,
+                  selectedColor: "#28A745",
+                };
+              }
+              currentDate.add(1, "week");
+            }
+          } else if (reserva.tipo === "avulso") {
+            marked[dateStr] = { selected: true, selectedColor: "#FFA500" };
+          } else if (reserva.tipo === "anual") {
+            const diaSemana = dataInicial.day();
+            const startOfPeriod = dataInicial.clone().startOf("day");
+            const endOfPeriod = dataInicial
+              .clone()
+              .add(12, "months")
+              .startOf("day");
+            let currentDate = startOfPeriod.clone();
+            while (currentDate.isSameOrBefore(endOfPeriod)) {
+              if (currentDate.day() === diaSemana) {
+                const anualDateStr = currentDate.format("YYYY-MM-DD");
+                marked[anualDateStr] = {
+                  selected: true,
+                  selectedColor: "#800080",
+                };
+              }
+              currentDate.add(1, "week");
+            }
+          }
+        });
+
+      Object.keys(rentalDates).forEach((date) => {
+        marked[date] = {
+          ...marked[date],
+          selected: true,
+          selectedColor: "#00FF00",
+        };
       });
 
-      const reservasDia = [
-        ...turmas.filter(
-          (t) => t.dia === diaSemana && t.campoId === selectedCampoId
-        ),
-        ...aulas.filter(
-          (a) => a.dia === diaSemana && a.campoId === selectedCampoId
-        ),
-        ...reservasFirestore.filter((r) => r.campoId === selectedCampoId),
-      ].sort((a, b) =>
-        (a.inicio || a.horarioInicio).localeCompare(b.inicio || b.horarioInicio)
+      marked[selected] = {
+        ...marked[selected],
+        selected: true,
+        selectedColor: "#007AFF",
+      };
+
+      "CalendarioScreen: Novos markedDates calculados:",
+        Object.keys(marked).length;
+      return marked;
+    };
+  }, [selectedCampoId]);
+
+  const updateMarkedDates = useCallback(
+    (reservasData, selected, rentalDates = selectedRentalDates) => {
+      const newMarkedDates = generateMarkedDates(
+        reservasData,
+        selected,
+        rentalDates
       );
-      return reservasDia;
-    } catch (error) {
-      console.error("Erro ao buscar reservas do dia:", error);
-      return [];
+      setMarkedDates((prev) => {
+        const prevKeys = Object.keys(prev);
+        const newKeys = Object.keys(newMarkedDates);
+        const keysChanged =
+          prevKeys.length !== newKeys.length ||
+          prevKeys.some((key) => !newKeys.includes(key));
+        const valuesChanged = prevKeys.some(
+          (key) =>
+            JSON.stringify(prev[key]) !== JSON.stringify(newMarkedDates[key])
+        );
+        const hasChanged = keysChanged || valuesChanged;
+        "CalendarioScreen: Comparando markedDates, mudou?", hasChanged;
+        return hasChanged ? newMarkedDates : prev;
+      });
+    },
+    [generateMarkedDates, selectedRentalDates]
+  );
+
+  useEffect(() => {
+    "CalendarioScreen: Segundo useEffect disparado, selectedCampoId:",
+      selectedCampoId,
+      "reservas:",
+      reservas.length,
+      "isLoading:",
+      isLoading;
+    if (selectedCampoId && reservas.length > 0 && !isLoading) {
+      ("CalendarioScreen: Disparando atualização de marcações");
+      updateMarkedDates(reservas, selectedDate);
+    } else {
+      ("CalendarioScreen: Condição do segundo useEffect não atendida");
     }
-  };
+  }, [selectedCampoId, selectedDate, isLoading]); // Remova 'reservas' e 'selectedRentalDates' // Remova `reservas` e `updateMarkedDates` das dependências
+
+  const fetchReservasDoDia = useCallback(
+    async (date) => {
+      "CalendarioScreen: fetchReservasDoDia iniciado para", date;
+      try {
+        const diaSemana = moment(date)
+          .format("dddd")
+          .toLowerCase()
+          .replace("-feira", "");
+        const turmas = await turmaService.getTurmas();
+        const aulas = await escolinhaService.getAulas();
+        const reservasFirestore = reservas.filter((reserva) => {
+          const reservaDate = moment(reserva.data);
+          const isSameDate = reservaDate.format("YYYY-MM-DD") === date;
+          const isMensal =
+            reserva.tipo === "mensal" &&
+            reservaDate.day() === moment(date).day() &&
+            moment(date).isBetween(
+              reservaDate,
+              reservaDate.clone().add(1, "month"),
+              null,
+              "[]"
+            );
+          const isAnual =
+            reserva.tipo === "anual" &&
+            reservaDate.day() === moment(date).day() &&
+            moment(date).isBetween(
+              reservaDate,
+              reservaDate.clone().add(12, "months"),
+              null,
+              "[]"
+            );
+          return isSameDate || isMensal || isAnual;
+        });
+
+        const reservasDia = [
+          ...turmas.filter(
+            (t) => t.dia === diaSemana && t.campoId === selectedCampoId
+          ),
+          ...aulas.filter(
+            (a) => a.dia === diaSemana && a.campoId === selectedCampoId
+          ),
+          ...reservasFirestore.filter((r) => r.campoId === selectedCampoId),
+        ].sort((a, b) =>
+          (a.inicio || a.horarioInicio).localeCompare(
+            b.inicio || b.horarioInicio
+          )
+        );
+        "CalendarioScreen: fetchReservasDoDia concluído, reservas do dia:",
+          reservasDia.length;
+        return reservasDia;
+      } catch (error) {
+        console.error("CalendarioScreen: Erro em fetchReservasDoDia:", error);
+        return [];
+      }
+    },
+    [reservas, selectedCampoId]
+  );
 
   const hasTimeConflict = (
     inicio,
@@ -245,9 +348,13 @@ export default function CalendarioScreen({ navigation }) {
     reservasExistentes,
     reservaId = null
   ) => {
+    "CalendarioScreen: Verificando conflito de horário, início:",
+      inicio,
+      "fim:",
+      fim;
     const newStart = moment(inicio, "HH:mm");
     const newEnd = moment(fim, "HH:mm");
-    return reservasExistentes.some((reserva) => {
+    const conflict = reservasExistentes.some((reserva) => {
       if (reservaId && reserva.id === reservaId) return false;
       const existingStart = moment(
         reserva.inicio || reserva.horarioInicio,
@@ -256,37 +363,52 @@ export default function CalendarioScreen({ navigation }) {
       const existingEnd = moment(reserva.fim || reserva.horarioFim, "HH:mm");
       return newStart.isBefore(existingEnd) && newEnd.isAfter(existingStart);
     });
+    "CalendarioScreen: Conflito encontrado?", conflict;
+    return conflict;
   };
 
-  const handleDayPress = (day) => {
-    const date = day.dateString;
-    if (selectionMode) {
-      const newSelectedDates = { ...selectedRentalDates };
-      if (newSelectedDates[date]) {
-        delete newSelectedDates[date];
+  const handleDayPress = useCallback(
+    (day) => {
+      const date = day.dateString;
+      "CalendarioScreen: handleDayPress, dia pressionado:", date;
+      if (selectionMode) {
+        const newSelectedDates = { ...selectedRentalDates };
+        if (newSelectedDates[date]) {
+          delete newSelectedDates[date];
+        } else {
+          newSelectedDates[date] = true;
+        }
+        "CalendarioScreen: Modo seleção, novos selectedRentalDates:",
+          Object.keys(newSelectedDates);
+        setSelectedRentalDates(newSelectedDates);
+        updateMarkedDates(reservas, selectedDate, newSelectedDates);
       } else {
-        newSelectedDates[date] = true;
+        ("CalendarioScreen: Modo normal, definindo selectedDate");
+        setSelectedDate(date);
+        if (!selectedCampoId) {
+          ("CalendarioScreen: Nenhum campo selecionado");
+          alert("Por favor, selecione um campo antes de continuar!");
+          return;
+        }
+        fetchReservasDoDia(date).then((data) => {
+          "CalendarioScreen: Reservas do dia carregadas:", data;
+          setReservasDoDia(data);
+          setModalVisible(true);
+        });
       }
-      setSelectedRentalDates(newSelectedDates);
-      setMarkedDates((prev) => ({
-        ...prev,
-        [date]: newSelectedDates[date]
-          ? { ...prev[date], selected: true, selectedColor: "#00FF00" }
-          : { ...prev[date], selected: false },
-      }));
-    } else {
-      setSelectedDate(date);
-      if (!selectedCampoId) {
-        alert("Por favor, selecione um campo antes de continuar!");
-        return;
-      }
-      fetchReservasDoDia(date)
-        .then(setReservasDoDia)
-        .then(() => setModalVisible(true));
-    }
-  };
+    },
+    [
+      selectionMode,
+      selectedRentalDates,
+      selectedCampoId,
+      reservas,
+      selectedDate,
+      updateMarkedDates,
+    ]
+  );
 
-  const handleEditReserva = (reserva) => {
+  const handleEditReserva = useCallback((reserva) => {
+    "CalendarioScreen: handleEditReserva, reserva:", reserva.id;
     setSelectedReserva(reserva);
     setEditNome(reserva.nome);
     setEditResponsavel(reserva.responsavel);
@@ -294,9 +416,10 @@ export default function CalendarioScreen({ navigation }) {
     setEditHorarioInicio(reserva.inicio || reserva.horarioInicio);
     setEditHorarioFim(reserva.fim || reserva.horarioFim);
     setEditModalVisible(true);
-  };
+  }, []);
 
   const handleSaveEdit = async () => {
+    ("CalendarioScreen: handleSaveEdit iniciado");
     if (
       !editNome ||
       !editResponsavel ||
@@ -304,6 +427,7 @@ export default function CalendarioScreen({ navigation }) {
       !editHorarioInicio ||
       !editHorarioFim
     ) {
+      ("CalendarioScreen: Campos obrigatórios faltando");
       Alert.alert("Erro", "Preencha todos os campos!");
       return;
     }
@@ -311,6 +435,7 @@ export default function CalendarioScreen({ navigation }) {
       !moment(editHorarioInicio, "HH:mm", true).isValid() ||
       !moment(editHorarioFim, "HH:mm", true).isValid()
     ) {
+      ("CalendarioScreen: Formato de horário inválido");
       Alert.alert(
         "Erro",
         "Horários devem estar no formato HH:mm (ex.: 17:00)!"
@@ -326,6 +451,7 @@ export default function CalendarioScreen({ navigation }) {
         selectedReserva.id
       )
     ) {
+      ("CalendarioScreen: Conflito de horário detectado");
       Alert.alert(
         "Erro",
         "Conflito de horário! Já existe uma reserva nesse intervalo."
@@ -345,21 +471,26 @@ export default function CalendarioScreen({ navigation }) {
         tipo: selectedReserva.tipo,
         campoId: selectedReserva.campoId,
       };
+      "CalendarioScreen: Atualizando reserva no Firestore:", updatedReserva;
       await updateDoc(reservaRef, updatedReserva);
       const updatedReservas = reservas.map((r) =>
         r.id === selectedReserva.id ? { ...r, ...updatedReserva } : r
       );
+      ("CalendarioScreen: Reservas atualizadas localmente");
       setReservas(updatedReservas);
       setReservasDoDia(await fetchReservasDoDia(selectedDate));
       updateMarkedDates(updatedReservas, selectedDate);
       setEditModalVisible(false);
+      setNeedsFetch(true);
+      ("CalendarioScreen: Reserva editada com sucesso");
     } catch (error) {
-      console.error("Erro ao atualizar reserva:", error);
+      console.error("CalendarioScreen: Erro ao atualizar reserva:", error);
       Alert.alert("Erro", "Não foi possível atualizar a reserva.");
     }
   };
 
   const handleCancelReserva = async (reservaId) => {
+    "CalendarioScreen: handleCancelReserva, reservaId:", reservaId;
     Alert.alert(
       "Confirmar Cancelamento",
       "Tem certeza que deseja cancelar esta reserva?",
@@ -370,15 +501,22 @@ export default function CalendarioScreen({ navigation }) {
           onPress: async () => {
             try {
               const reservaRef = doc(db, "reservas", reservaId);
+              ("CalendarioScreen: Deletando reserva do Firestore");
               await deleteDoc(reservaRef);
               const updatedReservas = reservas.filter(
                 (r) => r.id !== reservaId
               );
+              ("CalendarioScreen: Reservas atualizadas localmente");
               setReservas(updatedReservas);
               setReservasDoDia(await fetchReservasDoDia(selectedDate));
               updateMarkedDates(updatedReservas, selectedDate);
+              setNeedsFetch(true);
+              ("CalendarioScreen: Reserva cancelada com sucesso");
             } catch (error) {
-              console.error("Erro ao cancelar reserva:", error);
+              console.error(
+                "CalendarioScreen: Erro ao cancelar reserva:",
+                error
+              );
               Alert.alert("Erro", "Não foi possível cancelar a reserva.");
             }
           },
@@ -388,6 +526,7 @@ export default function CalendarioScreen({ navigation }) {
   };
 
   const handleAddReservaMensal = async () => {
+    ("CalendarioScreen: handleAddReservaMensal iniciado");
     const reservasDia = await fetchReservasDoDia(selectedDate);
     setModalVisible(false);
     navigation.navigate("HomeStack", {
@@ -399,18 +538,21 @@ export default function CalendarioScreen({ navigation }) {
         reservasExistentes: reservasDia,
       },
     });
+    ("CalendarioScreen: Navegando para AddTurma");
   };
 
-  const handleAddAvulso = () => {
+  const handleAddAvulso = useCallback(() => {
+    ("CalendarioScreen: handleAddAvulso iniciado");
     setAvulsoNome("");
     setAvulsoResponsavel("");
     setAvulsoTelefone("");
     setAvulsoHorarioInicio("");
     setAvulsoHorarioFim("");
     setAddAvulsoModalVisible(true);
-  };
+  }, []);
 
   const handleSaveAvulso = async () => {
+    ("CalendarioScreen: handleSaveAvulso iniciado");
     if (
       !avulsoNome ||
       !avulsoResponsavel ||
@@ -418,6 +560,7 @@ export default function CalendarioScreen({ navigation }) {
       !avulsoHorarioInicio ||
       !avulsoHorarioFim
     ) {
+      ("CalendarioScreen: Campos obrigatórios faltando");
       Alert.alert("Erro", "Preencha todos os campos!");
       return;
     }
@@ -425,6 +568,7 @@ export default function CalendarioScreen({ navigation }) {
       !moment(avulsoHorarioInicio, "HH:mm", true).isValid() ||
       !moment(avulsoHorarioFim, "HH:mm", true).isValid()
     ) {
+      ("CalendarioScreen: Formato de horário inválido");
       Alert.alert(
         "Erro",
         "Horários devem estar no formato HH:mm (ex.: 17:00)!"
@@ -433,6 +577,7 @@ export default function CalendarioScreen({ navigation }) {
     }
     const reservasDia = await fetchReservasDoDia(selectedDate);
     if (hasTimeConflict(avulsoHorarioInicio, avulsoHorarioFim, reservasDia)) {
+      ("CalendarioScreen: Conflito de horário detectado");
       Alert.alert(
         "Erro",
         "Conflito de horário! Já existe uma reserva nesse intervalo."
@@ -451,30 +596,173 @@ export default function CalendarioScreen({ navigation }) {
         campoId: selectedCampoId,
         tipo: "avulso",
       };
+      "CalendarioScreen: Salvando reserva avulsa no Firestore:", reserva;
       const docRef = await addDoc(collection(db, "reservas"), reserva);
       const updatedReservas = [...reservas, { id: docRef.id, ...reserva }];
+      ("CalendarioScreen: Reservas atualizadas localmente");
       setReservas(updatedReservas);
       setReservasDoDia(await fetchReservasDoDia(selectedDate));
       updateMarkedDates(updatedReservas, selectedDate);
       setAddAvulsoModalVisible(false);
+      setNeedsFetch(true);
+      ("CalendarioScreen: Reserva avulsa salva com sucesso");
     } catch (error) {
-      console.error("Erro ao salvar reserva avulsa:", error);
+      console.error("CalendarioScreen: Erro ao salvar reserva avulsa:", error);
       Alert.alert("Erro", "Não foi possível salvar a reserva.");
     }
   };
 
-  const toggleSelectionMode = () => {
-    setSelectionMode(!selectionMode);
-    if (selectionMode) setSelectedRentalDates({});
-    updateMarkedDates(
-      reservas,
-      selectedDate,
-      selectionMode ? selectedRentalDates : {}
-    );
-  };
+  const handleAddAula = useCallback(() => {
+    ("CalendarioScreen: handleAddAula iniciado");
+    setAulaNome("");
+    setAulaResponsavel("");
+    setAulaTelefone("");
+    setAulaHorarioInicio("");
+    setAulaHorarioFim("");
+    setAddAulaModalVisible(true);
+  }, []);
 
-  const handleConfirmRental = () => {
+  const handleSaveAula = async () => {
+    ("CalendarioScreen: handleSaveAula iniciado");
+    setIsSaving(true); // Mostrar loading
+    // ... validações e lógica ...
+    try {
+      // ... salvamento ...
+      setAddAulaModalVisible(false);
+      ("CalendarioScreen: Reserva anual salva com sucesso");
+    } catch (error) {
+      console.error("CalendarioScreen: Erro ao salvar reserva anual:", error);
+      Alert.alert("Erro", "Não foi possível salvar a reserva.");
+    } finally {
+      setIsSaving(false); // Esconder loading
+    }
+    if (
+      !aulaNome ||
+      !aulaResponsavel ||
+      !aulaTelefone ||
+      !aulaHorarioInicio ||
+      !aulaHorarioFim
+    ) {
+      ("CalendarioScreen: Campos obrigatórios faltando");
+      Alert.alert("Erro", "Preencha todos os campos!");
+      return;
+    }
+    if (
+      !moment(aulaHorarioInicio, "HH:mm", true).isValid() ||
+      !moment(aulaHorarioFim, "HH:mm", true).isValid()
+    ) {
+      ("CalendarioScreen: Formato de horário inválido");
+      Alert.alert(
+        "Erro",
+        "Horários devem estar no formato HH:mm (ex.: 17:00)!"
+      );
+      return;
+    }
+    if (aulaHorarioInicio === aulaHorarioFim) {
+      ("CalendarioScreen: Horário de início e fim iguais");
+      Alert.alert("Erro", "Horário de início e fim não podem ser iguais!");
+      return;
+    }
+
+    const startDate = moment(selectedDate);
+    const endDate = startDate.clone().add(12, "months");
+    let currentDate = startDate.clone();
+
+    // Carregar turmas e aulas apenas uma vez antes do loop
+    const turmas = await turmaService.getTurmas();
+    const aulas = await escolinhaService.getAulas();
+    const diaSemana = startDate
+      .format("dddd")
+      .toLowerCase()
+      .replace("-feira", "");
+
+    // Verificar conflitos usando dados locais
+    while (currentDate.isSameOrBefore(endDate)) {
+      if (currentDate.day() === startDate.day()) {
+        const dateStr = currentDate.format("YYYY-MM-DD");
+        "CalendarioScreen: Verificando conflitos para", dateStr;
+
+        // Filtrar reservas existentes para o dia atual
+        const reservasDia = [
+          ...turmas.filter(
+            (t) => t.dia === diaSemana && t.campoId === selectedCampoId
+          ),
+          ...aulas.filter(
+            (a) => a.dia === diaSemana && a.campoId === selectedCampoId
+          ),
+          ...reservas.filter((reserva) => {
+            const reservaDate = moment(reserva.data);
+            return (
+              reserva.campoId === selectedCampoId &&
+              reservaDate.day() === startDate.day() &&
+              moment(dateStr).isBetween(
+                reservaDate,
+                reservaDate
+                  .clone()
+                  .add(
+                    reserva.tipo === "anual" ? 12 : 1,
+                    reserva.tipo === "anual" ? "months" : "month"
+                  ),
+                null,
+                "[]"
+              )
+            );
+          }),
+        ];
+
+        if (hasTimeConflict(aulaHorarioInicio, aulaHorarioFim, reservasDia)) {
+          "CalendarioScreen: Conflito de horário em",
+            currentDate.format("YYYY-MM-DD");
+          Alert.alert(
+            "Erro",
+            `Conflito de horário no dia ${currentDate.format("DD/MM/YYYY")}!`
+          );
+          setIsSaving(false);
+          return;
+        }
+      }
+      currentDate.add(1, "week");
+    }
+
+    // Salvar a reserva
+    try {
+      const reserva = {
+        data: selectedDate,
+        horarioInicio: aulaHorarioInicio,
+        horarioFim: aulaHorarioFim,
+        nome: aulaNome,
+        responsavel: aulaResponsavel,
+        telefone: aulaTelefone,
+        campoId: selectedCampoId,
+        tipo: "anual",
+      };
+      "CalendarioScreen: Salvando reserva anual no Firestore:", reserva;
+      const docRef = await addDoc(collection(db, "reservas"), reserva);
+      const updatedReservas = [...reservas, { id: docRef.id, ...reserva }];
+      ("CalendarioScreen: Reservas atualizadas localmente");
+      setReservas(updatedReservas);
+      setReservasDoDia(await fetchReservasDoDia(selectedDate));
+      updateMarkedDates(updatedReservas, selectedDate);
+      setAddAulaModalVisible(false);
+      ("CalendarioScreen: Reserva anual salva com sucesso");
+    } catch (error) {
+      console.error("CalendarioScreen: Erro ao salvar reserva anual:", error);
+      Alert.alert("Erro", "Não foi possível salvar a reserva.");
+    }
+  };
+  const toggleSelectionMode = useCallback(() => {
+    "CalendarioScreen: toggleSelectionMode, novo estado:", !selectionMode;
+    setSelectionMode((prev) => !prev);
+    if (selectionMode) {
+      setSelectedRentalDates({});
+    }
+    updateMarkedDates(reservas, selectedDate);
+  }, [selectionMode, reservas, selectedDate, updateMarkedDates]);
+
+  const handleConfirmRental = useCallback(() => {
+    ("CalendarioScreen: handleConfirmRental iniciado");
     if (Object.keys(selectedRentalDates).length === 0) {
+      ("CalendarioScreen: Nenhum dia selecionado para aluguel");
       Alert.alert("Erro", "Nenhum dia selecionado para aluguel!");
       return;
     }
@@ -484,9 +772,10 @@ export default function CalendarioScreen({ navigation }) {
     setRentalHorarioInicio("");
     setRentalHorarioFim("");
     setAddRentalModalVisible(true);
-  };
+  }, [selectedRentalDates]);
 
   const handleSaveRental = async () => {
+    ("CalendarioScreen: handleSaveRental iniciado");
     if (
       !rentalNome ||
       !rentalResponsavel ||
@@ -494,6 +783,7 @@ export default function CalendarioScreen({ navigation }) {
       !rentalHorarioInicio ||
       !rentalHorarioFim
     ) {
+      ("CalendarioScreen: Campos obrigatórios faltando");
       Alert.alert("Erro", "Preencha todos os campos!");
       return;
     }
@@ -501,6 +791,7 @@ export default function CalendarioScreen({ navigation }) {
       !moment(rentalHorarioInicio, "HH:mm", true).isValid() ||
       !moment(rentalHorarioFim, "HH:mm", true).isValid()
     ) {
+      ("CalendarioScreen: Formato de horário inválido");
       Alert.alert(
         "Erro",
         "Horários devem estar no formato HH:mm (ex.: 17:00)!"
@@ -515,6 +806,7 @@ export default function CalendarioScreen({ navigation }) {
         if (
           hasTimeConflict(rentalHorarioInicio, rentalHorarioFim, reservasDia)
         ) {
+          "CalendarioScreen: Conflito de horário em", date;
           Alert.alert(
             "Erro",
             `Conflito de horário no dia ${moment(date).format("DD/MM/YYYY")}!`
@@ -535,44 +827,60 @@ export default function CalendarioScreen({ navigation }) {
           campoId: selectedCampoId,
           tipo: "avulso",
         };
+        "CalendarioScreen: Salvando reserva de aluguel:", reserva;
         const docRef = await addDoc(collection(db, "reservas"), reserva);
         newReservas.push({ id: docRef.id, ...reserva });
       }
 
       const updatedReservas = [...reservas, ...newReservas];
+      ("CalendarioScreen: Reservas atualizadas localmente");
       setReservas(updatedReservas);
       updateMarkedDates(updatedReservas, selectedDate);
       setSelectedRentalDates({});
       setSelectionMode(false);
       setAddRentalModalVisible(false);
+      setNeedsFetch(true);
+      ("CalendarioScreen: Reservas de aluguel salvas com sucesso");
     } catch (error) {
-      console.error("Erro ao salvar reservas de aluguel:", error);
+      console.error(
+        "CalendarioScreen: Erro ao salvar reservas de aluguel:",
+        error
+      );
       Alert.alert("Erro", "Não foi possível salvar as reservas.");
     }
   };
 
-  const renderReservaItem = ({ item }) => (
-    <TouchableOpacity
-      style={styles.reservaItem}
-      onPress={() => item.id && handleEditReserva(item)}
-    >
-      <Text style={styles.reservaText}>
-        {item.inicio || item.horarioInicio} - {item.fim || item.horarioFim}
-      </Text>
-      <Text style={styles.reservaText}>Nome: {item.nome}</Text>
-      <Text style={styles.reservaText}>Responsável: {item.responsavel}</Text>
-      <Text style={styles.reservaText}>Telefone: {item.telefone}</Text>
-      {item.id && (
+  const renderReservaItem = useCallback(
+    ({ item }) => {
+      "CalendarioScreen: Renderizando reserva:", item.id || item.nome;
+      return (
         <TouchableOpacity
-          style={styles.cancelButton}
-          onPress={() => handleCancelReserva(item.id)}
+          style={styles.reservaItem}
+          onPress={() => item.id && handleEditReserva(item)}
         >
-          <Text style={styles.cancelButtonText}>Cancelar Reserva</Text>
+          <Text style={styles.reservaText}>
+            {item.inicio || item.horarioInicio} - {item.fim || item.horarioFim}
+          </Text>
+          <Text style={styles.reservaText}>Nome: {item.nome}</Text>
+          <Text style={styles.reservaText}>
+            Responsável: {item.responsavel}
+          </Text>
+          <Text style={styles.reservaText}>Telefone: {item.telefone}</Text>
+          {item.id && (
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => handleCancelReserva(item.id)}
+            >
+              <Text style={styles.cancelButtonText}>Cancelar Reserva</Text>
+            </TouchableOpacity>
+          )}
         </TouchableOpacity>
-      )}
-    </TouchableOpacity>
+      );
+    },
+    [handleEditReserva]
   );
 
+  ("CalendarioScreen: Renderizando componente");
   return (
     <View style={styles.container}>
       <Text style={styles.label}>Selecione um Campo:</Text>
@@ -583,10 +891,16 @@ export default function CalendarioScreen({ navigation }) {
         <Text style={[styles.legendText, { color: "#28A745" }]}>
           ■ Aluguéis Mensais
         </Text>
+        <Text style={[styles.legendText, { color: "#800080" }]}>
+          ■ Aulas (Anual)
+        </Text>
       </View>
       <Picker
         selectedValue={selectedCampoId}
-        onValueChange={(itemValue) => setSelectedCampoId(itemValue)}
+        onValueChange={(itemValue) => {
+          "CalendarioScreen: Picker mudou, novo selectedCampoId:", itemValue;
+          setSelectedCampoId(itemValue);
+        }}
         style={styles.picker}
       >
         {isLoading ? (
@@ -632,7 +946,6 @@ export default function CalendarioScreen({ navigation }) {
           todayTextColor: "#007AFF",
         }}
       />
-      {/* Modal de Reservas do Dia */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -671,6 +984,12 @@ export default function CalendarioScreen({ navigation }) {
               <Text style={styles.addButtonText}>Adicionar Avulso</Text>
             </TouchableOpacity>
             <TouchableOpacity
+              style={styles.addAulaButton}
+              onPress={handleAddAula}
+            >
+              <Text style={styles.addButtonText}>Adicionar Aula</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
               style={styles.closeButton}
               onPress={() => setModalVisible(false)}
             >
@@ -679,7 +998,6 @@ export default function CalendarioScreen({ navigation }) {
           </View>
         </View>
       </Modal>
-      {/* Modal de Edição */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -724,6 +1042,7 @@ export default function CalendarioScreen({ navigation }) {
               style={styles.saveButton}
               onPress={handleSaveEdit}
             >
+              {isSaving && <ActivityIndicator size="large" color="#0000ff" />}
               <Text style={styles.saveButtonText}>Salvar</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -735,7 +1054,6 @@ export default function CalendarioScreen({ navigation }) {
           </View>
         </View>
       </Modal>
-      {/* Modal de Adição Avulsa */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -791,7 +1109,6 @@ export default function CalendarioScreen({ navigation }) {
           </View>
         </View>
       </Modal>
-      {/* Modal de Adição de Aluguel */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -850,6 +1167,61 @@ export default function CalendarioScreen({ navigation }) {
           </View>
         </View>
       </Modal>
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={addAulaModalVisible}
+        onRequestClose={() => setAddAulaModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Adicionar Aula (Anual)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Nome da Aula"
+              value={aulaNome}
+              onChangeText={setAulaNome}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Responsável"
+              value={aulaResponsavel}
+              onChangeText={setAulaResponsavel}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Telefone"
+              value={aulaTelefone}
+              onChangeText={setAulaTelefone}
+              keyboardType="phone-pad"
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Horário Início (ex.: 17:00)"
+              value={aulaHorarioInicio}
+              onChangeText={setAulaHorarioInicio}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Horário Fim (ex.: 18:00)"
+              value={aulaHorarioFim}
+              onChangeText={setAulaHorarioFim}
+            />
+            <TouchableOpacity
+              style={styles.saveButton}
+              onPress={handleSaveAula}
+            >
+              <Text style={styles.saveButtonText}>Salvar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setAddAulaModalVisible(false)}
+            >
+              <Text style={styles.closeButtonText}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -865,12 +1237,6 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     backgroundColor: "#f0f0f0",
     borderRadius: 5,
-  },
-  noCamposText: {
-    fontSize: 14,
-    color: "#999",
-    marginBottom: 10,
-    textAlign: "center",
   },
   toggleSelectionButton: {
     backgroundColor: "#FFA500",
@@ -921,6 +1287,14 @@ const styles = StyleSheet.create({
   },
   addAvulsoButton: {
     backgroundColor: "#28A745",
+    padding: 10,
+    borderRadius: 5,
+    marginBottom: 10,
+    width: "100%",
+    alignItems: "center",
+  },
+  addAulaButton: {
+    backgroundColor: "#800080",
     padding: 10,
     borderRadius: 5,
     marginBottom: 10,

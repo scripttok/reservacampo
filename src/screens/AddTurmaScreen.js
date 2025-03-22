@@ -44,16 +44,17 @@ export default function AddTurmaScreen({ route, navigation }) {
 
   useEffect(() => {
     if (data && moment(data).isValid()) {
-      console.log("AddTurmaScreen: Data recebida do Calendario:", data);
+      "AddTurmaScreen: Data recebida do Calendario:", data;
       setTurmaDia(
         moment(data).format("dddd").toLowerCase().replace("-feira", "")
       );
     } else if (dia && inicio && fim) {
-      console.log("AddTurmaScreen: Preenchendo com horário disponível:", {
-        dia,
-        inicio,
-        fim,
-      });
+      "AddTurmaScreen: Preenchendo com horário disponível:",
+        {
+          dia,
+          inicio,
+          fim,
+        };
       setTurmaDia(dia);
       setTurmaInicio(inicio);
       setTurmaFim(fim);
@@ -64,7 +65,7 @@ export default function AddTurmaScreen({ route, navigation }) {
     try {
       const reservasRef = collection(db, "reservas");
       const docRef = await addDoc(reservasRef, reserva);
-      console.log("Reserva salva no Firestore com ID:", docRef.id, reserva);
+      "Reserva salva no Firestore com ID:", docRef.id, reserva;
       return docRef.id;
     } catch (error) {
       console.error("Erro ao salvar reserva no Firestore:", error);
@@ -151,7 +152,7 @@ export default function AddTurmaScreen({ route, navigation }) {
         }
 
         await salvarReservaNoFirestore(reserva);
-        console.log("AddTurmaScreen: Reserva mensal salva com sucesso");
+        ("AddTurmaScreen: Reserva mensal salva com sucesso");
       } else {
         // Modo turmas ou escolinha
         const turmasExistentes = await turmaService.getTurmas();

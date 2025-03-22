@@ -14,43 +14,71 @@ import { paymentService } from "../services/paymentService";
 import { turmaService } from "../services/turmaService";
 import { alunoService } from "../services/alunoService";
 import { priceService } from "../services/priceService";
+import { campoService } from "../services/campoService"; // Importação adicionada
+import { db } from "../services/firebaseService";
+import { collection, query, getDocs } from "firebase/firestore";
+import moment from "moment";
 
 export default function ReportsScreen({ navigation }) {
   const [lucroTotal, setLucroTotal] = useState({
     turmas: 0,
     escolinha: 0,
+    mensal: 0,
     avulso: 0,
   });
   const [turmasLucro, setTurmasLucro] = useState([]);
   const [horariosLucro, setHorariosLucro] = useState([]);
   const [diasCheios, setDiasCheios] = useState([]);
   const [atrasos, setAtrasos] = useState([]);
+  const [mensalistas, setMensalistas] = useState([]);
+  const [avulsos, setAvulsos] = useState([]);
 
   const fetchData = async () => {
     try {
+      ("ReportsScreen: Iniciando busca de dados");
       const payments = await paymentService.getPayments();
       const turmas = await turmaService.getTurmas();
       const alunos = await alunoService.getAlunos();
       const prices = await priceService.getPrices();
+      const campos = await campoService.getCampos(); // Busca de campos adicionada
+      const reservasSnapshot = await getDocs(query(collection(db, "reservas")));
+      const reservas = reservasSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
 
-      // Lucro total com verificação de tipoServico
-      const lucro = payments.reduce(
+      "ReportsScreen: Reservas encontradas:", reservas.length;
+
+      // Separar reservas mensais e avulsas
+      const mensalistasData = reservas.filter((r) => r.tipo === "mensal");
+      const avulsosData = reservas.filter((r) => r.tipo === "avulso");
+
+      "ReportsScreen: Mensalistas encontrados:", mensalistasData.length;
+      "ReportsScreen: Avulsos encontrados:", avulsosData.length;
+
+      // Calcular lucro total
+      const lucroPayments = payments.reduce(
         (acc, payment) => {
           const tipoServico = payment.tipoServico
             ? payment.tipoServico.toLowerCase()
             : "desconhecido";
-          if (["turmas", "escolinha", "avulso"].includes(tipoServico)) {
+          if (["turmas", "escolinha"].includes(tipoServico)) {
             acc[tipoServico] += payment.valor;
-          } else {
-            console.warn(
-              `ReportsScreen: Tipo de serviço inválido ou desconhecido: ${tipoServico}`
-            );
           }
           return acc;
         },
-        { turmas: 0, escolinha: 0, avulso: 0 }
+        { turmas: 0, escolinha: 0, mensal: 0, avulso: 0 }
       );
-      setLucroTotal(lucro);
+
+      // Lucro dos aluguéis mensais (cada mensalista = 1 mês de preço "turmas")
+      const lucroMensal = mensalistasData.length * (prices.turmas || 0);
+      lucroPayments.mensal = lucroMensal;
+
+      // Lucro dos aluguéis avulsos (cada avulso = preço "avulso")
+      const lucroAvulso = avulsosData.length * (prices.avulso || 0);
+      lucroPayments.avulso = lucroAvulso;
+
+      setLucroTotal(lucroPayments);
 
       // Lucro por turma
       const turmasLucroData = turmas
@@ -101,6 +129,27 @@ export default function ReportsScreen({ navigation }) {
       const todosItens = [...turmasComType, ...alunosComType];
       const atrasosData = calcularAtrasos(todosItens, payments, prices);
       setAtrasos(atrasosData);
+
+      // Dados dos aluguéis mensais
+      const mensalistasFormatted = mensalistasData.map((m) => ({
+        nome: m.nome,
+        dataInicio: moment(m.data).format("DD/MM/YYYY"),
+        dataFim: moment(m.data).add(1, "month").format("DD/MM/YYYY"),
+        campo: campos.find((c) => c.id === m.campoId)?.nome || "Desconhecido",
+        horario: `${m.horarioInicio} - ${m.horarioFim}`,
+        ganho: prices.turmas || 0,
+      }));
+      setMensalistas(mensalistasFormatted);
+
+      // Dados dos aluguéis avulsos
+      const avulsosFormatted = avulsosData.map((a) => ({
+        nome: a.nome,
+        data: moment(a.data).format("DD/MM/YYYY"),
+        campo: campos.find((c) => c.id === a.campoId)?.nome || "Desconhecido",
+        horario: `${a.horarioInicio} - ${a.horarioFim}`,
+        ganho: prices.avulso || 0,
+      }));
+      setAvulsos(avulsosFormatted);
     } catch (error) {
       console.error("ReportsScreen: Erro ao carregar dados:", error);
       Alert.alert(
@@ -130,7 +179,7 @@ export default function ReportsScreen({ navigation }) {
           proximoPagamento.getFullYear(),
           proximoPagamento.getMonth() + 1,
           0
-        ).getDate(); // Correção aqui
+        ).getDate();
         proximoPagamento.setDate(Math.min(diaCadastro, ultimoDiaMes));
         if (proximoPagamento < today) {
           const valorDevido =
@@ -150,7 +199,7 @@ export default function ReportsScreen({ navigation }) {
           nextPaymentDate.getFullYear(),
           nextPaymentDate.getMonth() + 1,
           0
-        ).getDate(); // Correção aqui
+        ).getDate();
         nextPaymentDate.setDate(Math.min(diaCadastro, ultimoDiaMes));
         if (nextPaymentDate < today) {
           const valorDevido =
@@ -171,7 +220,7 @@ export default function ReportsScreen({ navigation }) {
     fetchData();
 
     const unsubscribe = navigation.addListener("focus", () => {
-      console.log("ReportsScreen: Tela em foco, recarregando dados...");
+      ("ReportsScreen: Tela em foco, recarregando dados...");
       fetchData();
     });
 
@@ -186,7 +235,8 @@ export default function ReportsScreen({ navigation }) {
         '"Tipo de Serviço";"Valor (R$)"',
         `"Turmas";"${lucroTotal.turmas.toFixed(2)}"`,
         `"Escolinha";"${lucroTotal.escolinha.toFixed(2)}"`,
-        `"Avulso";"${lucroTotal.avulso.toFixed(2)}"`,
+        `"Mensalistas";"${lucroTotal.mensal.toFixed(2)}"`,
+        `"Avulsos";"${lucroTotal.avulso.toFixed(2)}"`,
         "",
         '"Lucro por Turma"',
         '"Turma";"Valor (R$)"',
@@ -204,6 +254,24 @@ export default function ReportsScreen({ navigation }) {
         '"Nome";"Tipo";"Valor Devido (R$)"',
         ...atrasos.map(
           (a) => `"${a.nome}";"${a.tipo}";"${a.valorDevido.toFixed(2)}"`
+        ),
+        "",
+        '"Aluguéis Mensais"',
+        '"Nome";"Data Início";"Data Fim";"Campo";"Horário";"Ganho (R$)"',
+        ...mensalistas.map(
+          (m) =>
+            `"${m.nome}";"${m.dataInicio}";"${m.dataFim}";"${m.campo}";"${
+              m.horario
+            }";"${m.ganho.toFixed(2)}"`
+        ),
+        "",
+        '"Aluguéis Avulsos"',
+        '"Nome";"Data";"Campo";"Horário";"Ganho (R$)"',
+        ...avulsos.map(
+          (a) =>
+            `"${a.nome}";"${a.data}";"${a.campo}";"${
+              a.horario
+            }";"${a.ganho.toFixed(2)}"`
         ),
       ].join("\n");
 
@@ -246,7 +314,10 @@ export default function ReportsScreen({ navigation }) {
           Escolinha: R$ {lucroTotal.escolinha.toFixed(2)}
         </Text>
         <Text style={styles.itemText}>
-          Avulso: R$ {lucroTotal.avulso.toFixed(2)}
+          Mensalistas: R$ {lucroTotal.mensal.toFixed(2)}
+        </Text>
+        <Text style={styles.itemText}>
+          Avulsos: R$ {lucroTotal.avulso.toFixed(2)}
         </Text>
       </View>
 
@@ -299,6 +370,34 @@ export default function ReportsScreen({ navigation }) {
           ))
         ) : (
           <Text style={styles.emptyText}>Nenhum atraso registrado</Text>
+        )}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Aluguéis Mensais</Text>
+        {mensalistas.length > 0 ? (
+          mensalistas.map((m, index) => (
+            <Text key={index} style={styles.itemText}>
+              {m.nome}: {m.dataInicio} a {m.dataFim}, {m.campo}, {m.horario} -
+              R$ {m.ganho.toFixed(2)}
+            </Text>
+          ))
+        ) : (
+          <Text style={styles.emptyText}>Nenhum aluguel mensal registrado</Text>
+        )}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Aluguéis Avulsos</Text>
+        {avulsos.length > 0 ? (
+          avulsos.map((a, index) => (
+            <Text key={index} style={styles.itemText}>
+              {a.nome}: {a.data}, {a.campo}, {a.horario} - R${" "}
+              {a.ganho.toFixed(2)}
+            </Text>
+          ))
+        ) : (
+          <Text style={styles.emptyText}>Nenhum aluguel avulso registrado</Text>
         )}
       </View>
 
