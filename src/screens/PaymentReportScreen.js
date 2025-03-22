@@ -1,4 +1,3 @@
-// src/screens/PaymentReportScreen.js
 import React, { useState, useEffect } from "react";
 import {
   StyleSheet,
@@ -14,9 +13,11 @@ import { turmaService } from "../services/turmaService";
 import { alunoService } from "../services/alunoService";
 import { paymentService } from "../services/paymentService";
 import { priceService } from "../services/priceService";
+import { collection, getDocs, deleteDoc, doc } from "firebase/firestore";
+import { db } from "../services/firebaseService";
 
 export default function PaymentReportScreen({ navigation, route }) {
-  const { atrasoItemId } = route.params || {}; // Captura o atrasoItemId dos parâmetros da rota
+  const { atrasoItemId } = route.params || {};
   const [sections, setSections] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
@@ -29,40 +30,83 @@ export default function PaymentReportScreen({ navigation, route }) {
   const [prices, setPrices] = useState({ turmas: 0, escolinha: 0, avulso: 0 });
   const [payments, setPayments] = useState([]);
 
+  const fetchReservas = async () => {
+    try {
+      const reservasCol = collection(db, "reservas");
+      const reservasSnapshot = await getDocs(reservasCol);
+      const reservasList = reservasSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+        type: "reserva",
+      }));
+      console.log("PaymentReportScreen: Reservas recebidas:", reservasList);
+      return reservasList;
+    } catch (error) {
+      console.error("PaymentReportScreen: Erro ao buscar reservas:", error);
+      return [];
+    }
+  };
+
   const fetchData = async () => {
     try {
       const turmasData = await turmaService.getTurmas();
-      "Turmas recebidas:", turmasData; // Corrigido para
+      console.log("Turmas recebidas:", turmasData);
       const alunosData = await alunoService.getAlunos();
-      "Alunos recebidos:", alunosData; // Corrigido para
+      console.log("Alunos recebidos:", alunosData);
+      const reservasData = await fetchReservas();
       const pricesData = await priceService.getPrices();
-      "Preços recebidos:", pricesData; // Corrigido para
+      console.log("Preços recebidos:", pricesData);
       const paymentsData = await paymentService.getPayments();
-      "Pagamentos recebidos:", paymentsData; // Corrigido para
+      console.log("Pagamentos recebidos:", paymentsData);
 
       setPrices(pricesData);
       setPayments(paymentsData);
 
+      // Mapear turmas
       const turmasMapped = turmasData.map((item) => ({
         ...item,
         type: "turma",
       }));
+
+      // Mapear alunos
       const alunosMapped = alunosData.map((item) => ({
         ...item,
         type: "aluno",
       }));
 
+      // Separar reservas por tipo
+      const reservasMensais = reservasData
+        .filter((reserva) => reserva.tipo === "mensal")
+        .map((item) => ({ ...item, type: "reserva" }));
+      const reservasAnuais = reservasData
+        .filter((reserva) => reserva.tipo === "anual")
+        .map((item) => ({ ...item, type: "reserva" }));
+      const reservasAvulsas = reservasData
+        .filter((reserva) => reserva.tipo === "avulso" || !reserva.tipo) // Considera avulso se tipo não for especificado
+        .map((item) => ({ ...item, type: "reserva" }));
+
+      // Combinar nas seções corretas
       const combinedSections = [
-        { title: "Turmas Cadastradas", data: turmasMapped },
-        { title: "Alunos Cadastrados", data: alunosMapped },
+        {
+          title: "Turmas Cadastradas",
+          data: [...turmasMapped, ...reservasMensais],
+        },
+        {
+          title: "Alunos Cadastrados",
+          data: [...alunosMapped, ...reservasAnuais],
+        },
+        { title: "Reservas Avulsas", data: reservasAvulsas },
       ];
       setSections(combinedSections);
 
-      // Abrir modal automaticamente se houver atrasoItemId
       if (atrasoItemId) {
-        const item = [...turmasMapped, ...alunosMapped].find(
-          (i) => i.id === atrasoItemId
-        );
+        const item = [
+          ...turmasMapped,
+          ...alunosMapped,
+          ...reservasMensais,
+          ...reservasAnuais,
+          ...reservasAvulsas,
+        ].find((i) => i.id === atrasoItemId);
         if (item) handleOpenModal(item);
       }
     } catch (error) {
@@ -78,15 +122,29 @@ export default function PaymentReportScreen({ navigation, route }) {
 
   const handleOpenModal = (item) => {
     setSelectedItem(item);
-    setTipoServico(item.type === "turma" ? "Turmas" : "Escolinha");
+    if (item.type === "turma") {
+      setTipoServico("Turmas");
+      setValor(prices.turmas.toString());
+    } else if (item.type === "aluno") {
+      setTipoServico("Escolinha");
+      setValor(prices.escolinha.toString());
+    } else if (item.type === "reserva") {
+      setTipoServico(
+        item.tipo === "anual"
+          ? "Escolinha"
+          : item.tipo === "mensal"
+          ? "Turmas"
+          : "Avulso"
+      );
+      setValor(
+        item.tipo === "anual"
+          ? prices.escolinha.toString()
+          : item.tipo === "mensal"
+          ? prices.turmas.toString()
+          : prices.avulso.toString()
+      );
+    }
     setNomeResponsavel(item.responsavel || "");
-    setValor(
-      item.type === "turma"
-        ? prices.turmas.toString()
-        : item.type === "aluno"
-        ? prices.escolinha.toString()
-        : prices.avulso.toString()
-    );
     setModalVisible(true);
   };
 
@@ -97,13 +155,13 @@ export default function PaymentReportScreen({ navigation, route }) {
     const proximoPagamento = new Date(dataCriacao);
 
     proximoPagamento.setMonth(proximoPagamento.getMonth() + 1);
-    proximoPagamento.setDate(1); // Vai para o primeiro dia do próximo mês
+    proximoPagamento.setDate(1);
     const ultimoDiaMes = new Date(
       proximoPagamento.getFullYear(),
       proximoPagamento.getMonth() + 1,
       0
-    ).getDate(); // Último dia do mês
-    proximoPagamento.setDate(Math.min(diaCadastro, ultimoDiaMes)); // Usa o menor entre o dia do cadastro e o último dia do mês
+    ).getDate();
+    proximoPagamento.setDate(Math.min(diaCadastro, ultimoDiaMes));
 
     return proximoPagamento.toLocaleDateString("pt-BR", {
       day: "2-digit",
@@ -165,7 +223,7 @@ export default function PaymentReportScreen({ navigation, route }) {
         createdAt: new Date().toISOString(),
       };
       await paymentService.addPayment(newPayment);
-      await fetchData(); // Atualiza a lista para refletir o novo pagamento
+      await fetchData();
       setModalVisible(false);
       setValor("");
       alert(`Pagamento registrado para ${selectedItem.nome}!`);
@@ -177,9 +235,14 @@ export default function PaymentReportScreen({ navigation, route }) {
 
   const handleEditItem = () => {
     if (!selectedItem) return;
-    navigation.navigate(selectedItem.type === "turma" ? "Turmas" : "Alunos", {
-      item: selectedItem,
-    });
+    navigation.navigate(
+      selectedItem.type === "turma"
+        ? "Turmas"
+        : selectedItem.type === "aluno"
+        ? "Alunos"
+        : "CalendarioScreen",
+      { item: selectedItem }
+    );
     setModalVisible(false);
   };
 
@@ -193,8 +256,10 @@ export default function PaymentReportScreen({ navigation, route }) {
           try {
             if (selectedItem.type === "turma") {
               await turmaService.deleteTurma(selectedItem.id);
-            } else {
+            } else if (selectedItem.type === "aluno") {
               await alunoService.deleteAluno(selectedItem.id);
+            } else if (selectedItem.type === "reserva") {
+              await deleteDoc(doc(db, "reservas", selectedItem.id));
             }
             await fetchData();
             setModalVisible(false);
@@ -210,6 +275,17 @@ export default function PaymentReportScreen({ navigation, route }) {
 
   const renderItem = ({ item }) => {
     const paymentStatus = getPaymentStatus(item);
+    const valorAPagar =
+      item.type === "turma"
+        ? prices.turmas
+        : item.type === "aluno"
+        ? prices.escolinha
+        : item.type === "reserva" && item.tipo === "anual"
+        ? prices.escolinha
+        : item.type === "reserva" && item.tipo === "mensal"
+        ? prices.turmas
+        : prices.avulso;
+
     return (
       <TouchableOpacity
         style={styles.itemCard}
@@ -217,7 +293,7 @@ export default function PaymentReportScreen({ navigation, route }) {
       >
         {item.type === "turma" ? (
           <>
-            <Text style={styles.itemText}>Tipo: Turma</Text>
+            <Text style={styles.itemText}>Tipo: Turma (Mensal)</Text>
             <Text style={styles.itemText}>Nome: {item.nome}</Text>
             <Text style={styles.itemText}>Responsável: {item.responsavel}</Text>
             <Text style={styles.itemText}>Telefone: {item.telefone}</Text>
@@ -232,10 +308,11 @@ export default function PaymentReportScreen({ navigation, route }) {
             <Text style={styles.itemText}>
               Próximo Pagamento: {calcularProximoPagamento(item.createdAt)}
             </Text>
+            <Text style={styles.itemText}>Valor a Pagar: R$ {valorAPagar}</Text>
           </>
-        ) : (
+        ) : item.type === "aluno" ? (
           <>
-            <Text style={styles.itemText}>Tipo: Aluno</Text>
+            <Text style={styles.itemText}>Tipo: Aluno (Anual)</Text>
             <Text style={styles.itemText}>Nome: {item.nome}</Text>
             <Text style={styles.itemText}>Responsável: {item.responsavel}</Text>
             <Text style={styles.itemText}>
@@ -254,6 +331,33 @@ export default function PaymentReportScreen({ navigation, route }) {
             <Text style={styles.itemText}>
               Próximo Pagamento: {calcularProximoPagamento(item.createdAt)}
             </Text>
+            <Text style={styles.itemText}>Valor a Pagar: R$ {valorAPagar}</Text>
+          </>
+        ) : (
+          <>
+            <Text style={styles.itemText}>
+              Tipo: Reserva (
+              {item.tipo === "anual"
+                ? "Anual"
+                : item.tipo === "mensal"
+                ? "Mensal"
+                : "Avulso"}
+              )
+            </Text>
+            <Text style={styles.itemText}>Nome: {item.nome}</Text>
+            <Text style={styles.itemText}>Responsável: {item.responsavel}</Text>
+            <Text style={styles.itemText}>Telefone: {item.telefone}</Text>
+            <Text style={styles.itemText}>
+              Data: {new Date(item.data).toLocaleDateString("pt-BR")}
+            </Text>
+            <Text style={styles.itemText}>
+              Horário: {item.horarioInicio} - {item.horarioFim}
+            </Text>
+            <Text style={styles.itemText}>
+              Próximo Pagamento:{" "}
+              {calcularProximoPagamento(item.createdAt || item.data)}
+            </Text>
+            <Text style={styles.itemText}>Valor a Pagar: R$ {valorAPagar}</Text>
           </>
         )}
         {paymentStatus && (
@@ -314,7 +418,10 @@ export default function PaymentReportScreen({ navigation, route }) {
                   styles.serviceButton,
                   tipoServico === "Turmas" && styles.serviceButtonSelected,
                 ]}
-                onPress={() => setTipoServico("Turmas")}
+                onPress={() => {
+                  setTipoServico("Turmas");
+                  setValor(prices.turmas.toString());
+                }}
               >
                 <Text style={styles.serviceButtonText}>Turmas</Text>
               </TouchableOpacity>
@@ -323,7 +430,10 @@ export default function PaymentReportScreen({ navigation, route }) {
                   styles.serviceButton,
                   tipoServico === "Escolinha" && styles.serviceButtonSelected,
                 ]}
-                onPress={() => setTipoServico("Escolinha")}
+                onPress={() => {
+                  setTipoServico("Escolinha");
+                  setValor(prices.escolinha.toString());
+                }}
               >
                 <Text style={styles.serviceButtonText}>Escolinha</Text>
               </TouchableOpacity>
@@ -332,7 +442,10 @@ export default function PaymentReportScreen({ navigation, route }) {
                   styles.serviceButton,
                   tipoServico === "Avulso" && styles.serviceButtonSelected,
                 ]}
-                onPress={() => setTipoServico("Avulso")}
+                onPress={() => {
+                  setTipoServico("Avulso");
+                  setValor(prices.avulso.toString());
+                }}
               >
                 <Text style={styles.serviceButtonText}>Avulso</Text>
               </TouchableOpacity>
@@ -395,6 +508,8 @@ export default function PaymentReportScreen({ navigation, route }) {
     </View>
   );
 }
+
+// Estilos permanecem iguais, omitidos para brevity
 
 const styles = StyleSheet.create({
   container: {

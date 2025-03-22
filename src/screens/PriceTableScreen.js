@@ -11,16 +11,16 @@ import {
 import { priceService } from "../services/priceService";
 
 export default function PriceTableScreen({ navigation }) {
-  const [precoTurmas, setPrecoTurmas] = useState("");
-  const [precoEscolinha, setPrecoEscolinha] = useState("");
+  const [precoMensal, setprecoMensal] = useState("");
+  const [precoAnual, setprecoAnual] = useState("");
   const [precoAvulso, setPrecoAvulso] = useState("");
 
   useEffect(() => {
     const fetchPrices = async () => {
       try {
         const prices = await priceService.getPrices();
-        setPrecoTurmas(prices.turmas?.toString() || "");
-        setPrecoEscolinha(prices.escolinha?.toString() || "");
+        setprecoMensal(prices.turmas?.toString() || "");
+        setprecoAnual(prices.escolinha?.toString() || "");
         setPrecoAvulso(prices.avulso?.toString() || "");
       } catch (error) {
         console.error("PriceTableScreen: Erro ao carregar preços:", error);
@@ -32,8 +32,8 @@ export default function PriceTableScreen({ navigation }) {
   const handleSavePrices = async () => {
     try {
       const prices = {
-        turmas: parseFloat(precoTurmas) || 0,
-        escolinha: parseFloat(precoEscolinha) || 0,
+        turmas: parseFloat(precoMensal) || 0,
+        escolinha: parseFloat(precoAnual) || 0,
         avulso: parseFloat(precoAvulso) || 0,
       };
       await priceService.setPrices(prices);
@@ -51,31 +51,31 @@ export default function PriceTableScreen({ navigation }) {
         <Text style={styles.title}>Tabela de Preços</Text>
       </View>
       <View style={styles.form}>
-        <Text style={styles.label}>Turmas (Mensal)</Text>
+        <Text style={styles.label}>Mensalistas (Mensal)</Text>
         <TextInput
           style={styles.input}
           placeholder="Ex.: 200.00"
           keyboardType="numeric"
-          value={precoTurmas}
-          onChangeText={setPrecoTurmas}
+          value={precoMensal}
+          onChangeText={setprecoMensal}
         />
         <Text style={styles.description}>
           Valor mensal cobrado das turmas cadastradas.
         </Text>
 
-        <Text style={styles.label}>Escolinha (Mensal)</Text>
+        <Text style={styles.label}>Escolinha (Anual)</Text>
         <TextInput
           style={styles.input}
           placeholder="Ex.: 150.00"
           keyboardType="numeric"
-          value={precoEscolinha}
-          onChangeText={setPrecoEscolinha}
+          value={precoAnual}
+          onChangeText={setprecoAnual}
         />
         <Text style={styles.description}>
           Valor mensal cobrado dos alunos da escolinha.
         </Text>
 
-        <Text style={styles.label}>Avulso (Por dia)</Text>
+        <Text style={styles.label}>Avulso</Text>
         <TextInput
           style={styles.input}
           placeholder="Ex.: 100.00"
