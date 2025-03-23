@@ -18,13 +18,13 @@ import { alunoService } from "../services/alunoService";
 import { configService } from "../services/configService";
 import { paymentService } from "../services/paymentService";
 import { db } from "../services/firebaseService";
-import { collection, query, getDocs } from "firebase/firestore";
+import { collection, query, getDocs, doc, setDoc } from "firebase/firestore";
 import moment from "moment";
 import Campo from "../components/Campo";
 import { DrawerActions } from "@react-navigation/native";
 
 export default function HomeScreen({ navigation, route }) {
-  const { mode = "turmas", openAddModal, openConfigModal } = route.params || {};
+  const { mode = "turmas" } = route.params || {};
   const [campos, setCampos] = useState([]);
   const [turmasOuAulas, setTurmasOuAulas] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -41,11 +41,11 @@ export default function HomeScreen({ navigation, route }) {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        "HomeScreen: Buscando dados, modo atual:", mode;
+        console.log("HomeScreen: Buscando dados, modo atual:", mode);
         const camposData = await campoService.getCampos();
         const horario = await configService.getHorarioFuncionamento();
         const paymentsData = await paymentService.getPayments();
-        "HomeScreen: Payments Data:", paymentsData;
+        console.log("HomeScreen: Payments Data:", paymentsData);
         let turmasOuAulasData = [];
         if (mode === "turmas") {
           turmasOuAulasData = await turmaService.getTurmas();
@@ -57,23 +57,26 @@ export default function HomeScreen({ navigation, route }) {
           turmasOuAulasData = await escolinhaService.getAulas();
           turmasOuAulasData = turmasOuAulasData.map((item) => ({
             ...item,
-            type: "aula", // Mantido como "aula" conforme seu código
+            type: "aula",
           }));
         }
         setCampos(camposData);
         setTurmasOuAulas(turmasOuAulasData);
         setHorarioInicio(horario.inicio);
         setHorarioFim(horario.fim);
+        console.log("HomeScreen: Horários carregados inicialmente:", {
+          inicio: horario.inicio,
+          fim: horario.fim,
+        });
 
         const atraso = await checkPaymentStatus(
           turmasOuAulasData,
           paymentsData,
           mode
         );
-        "HomeScreen: Item em atraso encontrado:", atraso;
+        console.log("HomeScreen: Item em atraso encontrado:", atraso);
         setAtrasoItem(atraso);
 
-        // Verificar aluguéis mensais próximos do vencimento
         await checkMonthlyRentalsExpiration();
       } catch (error) {
         console.error("HomeScreen: Erro ao carregar dados:", error);
@@ -98,15 +101,29 @@ export default function HomeScreen({ navigation, route }) {
       ])
     ).start();
 
-    navigation.setParams({
-      openAddModal: () => {
-        ("HomeScreen: Abrindo modal de adicionar campo");
-        setAddModalVisible(true);
-      },
-      openConfigModal: () => {
-        ("HomeScreen: Abrindo modal de configurar horários");
-        setConfigModalVisible(true);
-      },
+    // Configurar opções de navegação
+    navigation.setOptions({
+      headerRight: () => (
+        <View style={{ flexDirection: "row" }}>
+          <TouchableOpacity
+            onPress={() => {
+              console.log("HomeScreen: Abrindo modal de adicionar campo");
+              setAddModalVisible(true);
+            }}
+            style={{ marginRight: 15 }}
+          >
+            <Text style={{ color: "#fff", fontSize: 16 }}>Adicionar</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => {
+              console.log("HomeScreen: Abrindo modal de configurar horários");
+              setConfigModalVisible(true);
+            }}
+          >
+            <Text style={{ color: "#fff", fontSize: 16 }}>Configurar</Text>
+          </TouchableOpacity>
+        </View>
+      ),
     });
 
     const unsubscribe = navigation.addListener("focus", fetchData);
@@ -115,7 +132,7 @@ export default function HomeScreen({ navigation, route }) {
 
   const fetchReservasMensais = async () => {
     try {
-      ("HomeScreen: Buscando reservas mensais");
+      console.log("HomeScreen: Buscando reservas mensais");
       const reservasRef = collection(db, "reservas");
       const q = query(reservasRef);
       const querySnapshot = await getDocs(q);
@@ -126,7 +143,7 @@ export default function HomeScreen({ navigation, route }) {
       const mensais = reservasData.filter(
         (reserva) => reserva.tipo === "mensal"
       );
-      "HomeScreen: Reservas mensais encontradas:", mensais;
+      console.log("HomeScreen: Reservas mensais encontradas:", mensais);
       return mensais;
     } catch (error) {
       console.error("Erro ao buscar reservas mensais do Firestore:", error);
@@ -135,11 +152,11 @@ export default function HomeScreen({ navigation, route }) {
   };
 
   const checkMonthlyRentalsExpiration = async () => {
-    ("HomeScreen: Verificando vencimento de aluguéis mensais");
+    console.log("HomeScreen: Verificando vencimento de aluguéis mensais");
     const reservasMensais = await fetchReservasMensais();
-    const today = moment(); // Data atual do sistema
+    const today = moment();
     const todayStr = today.format("YYYY-MM-DD");
-    "HomeScreen: Data atual:", todayStr;
+    console.log("HomeScreen: Data atual:", todayStr);
 
     for (const reserva of reservasMensais) {
       const dataInicial = moment(reserva.data);
@@ -147,13 +164,15 @@ export default function HomeScreen({ navigation, route }) {
       const startOfLastWeek = dataVencimento
         .clone()
         .startOf("week")
-        .add(1, "day"); // Segunda-feira
+        .add(1, "day");
 
-      `HomeScreen: Reserva "${reserva.nome}", início: ${dataInicial.format(
-        "DD/MM/YYYY"
-      )}, vencimento: ${dataVencimento.format(
-        "DD/MM/YYYY"
-      )}, início última semana: ${startOfLastWeek.format("DD/MM/YYYY")}`;
+      console.log(
+        `HomeScreen: Reserva "${reserva.nome}", início: ${dataInicial.format(
+          "DD/MM/YYYY"
+        )}, vencimento: ${dataVencimento.format(
+          "DD/MM/YYYY"
+        )}, início última semana: ${startOfLastWeek.format("DD/MM/YYYY")}`
+      );
 
       if (
         today.isBetween(startOfLastWeek, dataVencimento, null, "[]") &&
@@ -163,9 +182,11 @@ export default function HomeScreen({ navigation, route }) {
         const lastAlertDate = await AsyncStorage.getItem(lastAlertKey);
         const lastAlertMoment = lastAlertDate ? moment(lastAlertDate) : null;
 
-        `HomeScreen: Reserva "${
-          reserva.nome
-        }" na última semana. Último alerta: ${lastAlertDate || "nenhum"}`;
+        console.log(
+          `HomeScreen: Reserva "${
+            reserva.nome
+          }" na última semana. Último alerta: ${lastAlertDate || "nenhum"}`
+        );
 
         if (!lastAlertMoment || !lastAlertMoment.isSame(today, "day")) {
           Alert.alert(
@@ -175,15 +196,21 @@ export default function HomeScreen({ navigation, route }) {
             }" vence em ${dataVencimento.format(
               "DD/MM/YYYY"
             )} (${dataVencimento.fromNow()}).`,
-            [{ text: "OK", onPress: () => "Alerta confirmado" }]
+            [{ text: "OK", onPress: () => console.log("Alerta confirmado") }]
           );
           await AsyncStorage.setItem(lastAlertKey, todayStr);
-          `HomeScreen: Alerta exibido para "${reserva.nome}", salvo em ${lastAlertKey}`;
+          console.log(
+            `HomeScreen: Alerta exibido para "${reserva.nome}", salvo em ${lastAlertKey}`
+          );
         } else {
-          `HomeScreen: Alerta para "${reserva.nome}" já exibido hoje`;
+          console.log(
+            `HomeScreen: Alerta para "${reserva.nome}" já exibido hoje`
+          );
         }
       } else {
-        `HomeScreen: Reserva "${reserva.nome}" fora da última semana`;
+        console.log(
+          `HomeScreen: Reserva "${reserva.nome}" fora da última semana`
+        );
       }
     }
   };
@@ -192,7 +219,6 @@ export default function HomeScreen({ navigation, route }) {
     if (!payments || !Array.isArray(payments)) return null;
     if (!items || !Array.isArray(items)) return null;
 
-    // Buscar reservas do Firestore
     const reservasRef = collection(db, "reservas");
     const q = query(reservasRef);
     const querySnapshot = await getDocs(q);
@@ -208,7 +234,7 @@ export default function HomeScreen({ navigation, route }) {
       if (!item || !item.type) continue;
 
       const dataBase = item.type === "reserva" ? item.data : item.createdAt;
-      if (!dataBase) continue; // Pular se não houver data base
+      if (!dataBase) continue;
 
       const lastPayment = payments
         .filter((p) => p.itemId === item.id)
@@ -268,14 +294,16 @@ export default function HomeScreen({ navigation, route }) {
 
   const handleAtrasoPress = () => {
     if (atrasoItem) {
-      "HomeScreen: Navegando para PaymentReport com item em atraso:",
-        atrasoItem;
+      console.log(
+        "HomeScreen: Navegando para PaymentReport com item em atraso:",
+        atrasoItem
+      );
       navigation.navigate("PaymentReport", { atrasoItemId: atrasoItem.id });
     }
   };
 
   const handleCampoPress = (campo) => {
-    "HomeScreen: Clicou no campo:", campo, "Modo:", mode;
+    console.log("HomeScreen: Clicou no campo:", campo, "Modo:", mode);
     if (!campo) {
       console.error("HomeScreen: Campo é undefined!");
       return;
@@ -284,7 +312,7 @@ export default function HomeScreen({ navigation, route }) {
   };
 
   const handleLongPressCampo = (campo) => {
-    "HomeScreen: Long press no campo:", campo;
+    console.log("HomeScreen: Long press no campo:", campo);
     setCampoParaExcluir(campo);
     setModalVisible(true);
   };
@@ -324,9 +352,21 @@ export default function HomeScreen({ navigation, route }) {
   };
 
   const handleSaveHorario = async () => {
+    console.log("HomeScreen: Tentando salvar horários:", {
+      inicio: horarioInicio,
+      fim: horarioFim,
+    });
     try {
-      await configService.setHorarioFuncionamento(horarioInicio, horarioFim);
+      await setDoc(doc(db, "configuracoes", "horarios"), {
+        inicio: horarioInicio,
+        fim: horarioFim,
+      });
+      console.log("HomeScreen: Horários salvos com sucesso no Firestore:", {
+        inicio: horarioInicio,
+        fim: horarioFim,
+      });
       setConfigModalVisible(false);
+      navigation.navigate("Relatorios", { shouldUpdate: true });
     } catch (error) {
       console.error(
         "HomeScreen: Erro ao salvar horário de funcionamento:",
@@ -445,13 +485,19 @@ export default function HomeScreen({ navigation, route }) {
               style={styles.input}
               placeholder="Início (ex.: 07:00)"
               value={horarioInicio}
-              onChangeText={setHorarioInicio}
+              onChangeText={(text) => {
+                setHorarioInicio(text);
+                console.log("HomeScreen: Horário início digitado:", text);
+              }}
             />
             <TextInput
               style={styles.input}
               placeholder="Fim (ex.: 23:00)"
               value={horarioFim}
-              onChangeText={setHorarioFim}
+              onChangeText={(text) => {
+                setHorarioFim(text);
+                console.log("HomeScreen: Horário fim digitado:", text);
+              }}
             />
             <View style={styles.modalButtons}>
               <TouchableOpacity

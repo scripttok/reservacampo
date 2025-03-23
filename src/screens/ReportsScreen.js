@@ -49,6 +49,7 @@ export default function ReportsScreen({ navigation, route }) {
 
   const fetchData = async () => {
     try {
+      console.log("ReportsScreen: Iniciando fetchData");
       const payments = await paymentService.getPayments();
       const turmas = await turmaService.getTurmas();
       const alunos = await alunoService.getAlunos();
@@ -117,14 +118,7 @@ export default function ReportsScreen({ navigation, route }) {
         setMediaMensalLucro({ anual: 0, mensal: 0, avulso: 0 });
       }
 
-      const horarios = calcularHorariosDisponiveis(
-        turmas,
-        alunos,
-        reservas,
-        campos,
-        prices
-      );
-      setHorariosDisponiveis(horarios);
+      console.log("ReportsScreen: fetchData concluído");
     } catch (error) {
       console.error("ReportsScreen: Erro ao carregar dados:", error);
       Alert.alert(
@@ -141,6 +135,9 @@ export default function ReportsScreen({ navigation, route }) {
     campos,
     prices
   ) => {
+    console.log("ReportsScreen: Calculando horários disponíveis com:", {
+      horarioOperacao,
+    });
     const today = moment("2025-03-23");
     const startOfMonth = today.clone().startOf("month");
     const endOfMonth = today.clone().endOf("month");
@@ -238,7 +235,10 @@ export default function ReportsScreen({ navigation, route }) {
       "hours",
       true
     );
-    console.log("Horas totais por dia:", horasTotaisDia);
+    console.log(
+      "ReportsScreen: Horas totais por dia calculadas:",
+      horasTotaisDia
+    );
 
     const horariosDisponiveisData = [];
     let currentDate = startOfMonth.clone();
@@ -266,6 +266,10 @@ export default function ReportsScreen({ navigation, route }) {
       currentDate.add(1, "day");
     }
 
+    console.log(
+      "ReportsScreen: Horários disponíveis calculados:",
+      horariosDisponiveisData
+    );
     return horariosDisponiveisData.sort((a, b) => a.data.localeCompare(b.data));
   };
 
@@ -352,57 +356,88 @@ export default function ReportsScreen({ navigation, route }) {
     return atrasados.sort((a, b) => a.nome.localeCompare(b.nome));
   };
 
+  // useEffect para carregar dados iniciais e configurar o listener do Firestore
   useEffect(() => {
+    console.log("ReportsScreen: useEffect inicial iniciado");
     fetchData();
 
     const unsubscribeHorarios = onSnapshot(
       doc(db, "configuracoes", "horarios"),
-      async (docSnapshot) => {
+      (docSnapshot) => {
+        console.log("ReportsScreen: onSnapshot disparado");
         if (docSnapshot.exists()) {
           const { inicio, fim } = docSnapshot.data();
+          console.log("ReportsScreen: Dados recebidos do Firestore:", {
+            inicio,
+            fim,
+          });
           setHorarioOperacao({ inicio, fim });
-          console.log("Horários atualizados:", { inicio, fim });
-
-          // Recalcula apenas os horários disponíveis
-          const turmas = await turmaService.getTurmas();
-          const alunos = await alunoService.getAlunos();
-          const reservas = (
-            await getDocs(query(collection(db, "reservas")))
-          ).docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-          const campos = await campoService.getCampos();
-          const prices = await priceService.getPrices();
-          const horarios = calcularHorariosDisponiveis(
-            turmas,
-            alunos,
-            reservas,
-            campos,
-            prices
-          );
-          setHorariosDisponiveis(horarios);
         } else {
-          console.log("Nenhuma configuração encontrada, usando padrão.");
+          console.log(
+            "ReportsScreen: Nenhuma configuração encontrada, usando padrão."
+          );
           setHorarioOperacao({ inicio: "09:00", fim: "22:00" });
         }
       },
       (error) => {
-        console.error("Erro ao escutar horários:", error);
+        console.error("ReportsScreen: Erro ao escutar horários:", error);
       }
     );
 
     const unsubscribeFocus = navigation.addListener("focus", () => {
       const shouldUpdate = route.params?.shouldUpdate || false;
       if (shouldUpdate) {
-        console.log("ReportsScreen: Mudança detectada, atualizando dados...");
+        console.log(
+          "ReportsScreen: Foco detectado, atualizando dados com shouldUpdate..."
+        );
         fetchData();
         navigation.setParams({ shouldUpdate: false });
       }
     });
 
     return () => {
+      console.log("ReportsScreen: Limpando listeners");
       unsubscribeHorarios();
       unsubscribeFocus();
     };
   }, [navigation, route.params?.shouldUpdate]);
+
+  // useEffect separado para recalcular horários disponíveis quando horarioOperacao mudar
+  useEffect(() => {
+    console.log("ReportsScreen: useEffect de recálculo disparado com:", {
+      horarioOperacao,
+    });
+    const recalcularHorarios = async () => {
+      try {
+        console.log("ReportsScreen: Recalculando horários disponíveis");
+        const turmas = await turmaService.getTurmas();
+        const alunos = await alunoService.getAlunos();
+        const reservas = (
+          await getDocs(query(collection(db, "reservas")))
+        ).docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        const campos = await campoService.getCampos();
+        const prices = await priceService.getPrices();
+        const horarios = calcularHorariosDisponiveis(
+          turmas,
+          alunos,
+          reservas,
+          campos,
+          prices
+        );
+        setHorariosDisponiveis(horarios);
+        console.log(
+          "ReportsScreen: Horários disponíveis atualizados:",
+          horarios
+        );
+      } catch (error) {
+        console.error(
+          "ReportsScreen: Erro ao recalcular horários disponíveis:",
+          error
+        );
+      }
+    };
+    recalcularHorarios();
+  }, [horarioOperacao]);
 
   const exportToCSV = async () => {
     try {
