@@ -1,4 +1,3 @@
-// src/screens/ReportsScreen.js
 import React, { useState, useEffect } from "react";
 import {
   StyleSheet,
@@ -14,7 +13,7 @@ import { paymentService } from "../services/paymentService";
 import { turmaService } from "../services/turmaService";
 import { alunoService } from "../services/alunoService";
 import { priceService } from "../services/priceService";
-import { campoService } from "../services/campoService"; // Importação adicionada
+import { campoService } from "../services/campoService";
 import { db } from "../services/firebaseService";
 import { collection, query, getDocs } from "firebase/firestore";
 import moment from "moment";
@@ -32,29 +31,36 @@ export default function ReportsScreen({ navigation }) {
   const [atrasos, setAtrasos] = useState([]);
   const [mensalistas, setMensalistas] = useState([]);
   const [avulsos, setAvulsos] = useState([]);
+  const [alugueisAtrasados, setAlugueisAtrasados] = useState([]);
+  const [alugueisPagos, setAlugueisPagos] = useState([]);
 
   const fetchData = async () => {
     try {
-      ("ReportsScreen: Iniciando busca de dados");
+      console.log("ReportsScreen: Iniciando busca de dados");
       const payments = await paymentService.getPayments();
       const turmas = await turmaService.getTurmas();
       const alunos = await alunoService.getAlunos();
       const prices = await priceService.getPrices();
-      const campos = await campoService.getCampos(); // Busca de campos adicionada
+      const campos = await campoService.getCampos();
       const reservasSnapshot = await getDocs(query(collection(db, "reservas")));
       const reservas = reservasSnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
 
-      "ReportsScreen: Reservas encontradas:", reservas.length;
+      console.log("ReportsScreen: Reservas encontradas:", reservas.length);
 
-      // Separar reservas mensais e avulsas
+      // Separar reservas por tipo
       const mensalistasData = reservas.filter((r) => r.tipo === "mensal");
       const avulsosData = reservas.filter((r) => r.tipo === "avulso");
+      const anuaisData = reservas.filter((r) => r.tipo === "anual");
 
-      "ReportsScreen: Mensalistas encontrados:", mensalistasData.length;
-      "ReportsScreen: Avulsos encontrados:", avulsosData.length;
+      console.log(
+        "ReportsScreen: Mensalistas encontrados:",
+        mensalistasData.length
+      );
+      console.log("ReportsScreen: Avulsos encontrados:", avulsosData.length);
+      console.log("ReportsScreen: Anuais encontrados:", anuaisData.length);
 
       // Calcular lucro total
       const lucroPayments = payments.reduce(
@@ -64,18 +70,25 @@ export default function ReportsScreen({ navigation }) {
             : "desconhecido";
           if (["turmas", "escolinha"].includes(tipoServico)) {
             acc[tipoServico] += payment.valor;
+          } else if (tipoServico === "avulso") {
+            acc.avulso += payment.valor;
           }
           return acc;
         },
         { turmas: 0, escolinha: 0, mensal: 0, avulso: 0 }
       );
 
-      // Lucro dos aluguéis mensais (cada mensalista = 1 mês de preço "turmas")
-      const lucroMensal = mensalistasData.length * (prices.turmas || 0);
+      const lucroMensal = mensalistasData.reduce((sum, m) => {
+        const lastPayment = payments
+          .filter((p) => p.itemId === m.id)
+          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+        return lastPayment ? sum + prices.turmas : sum;
+      }, 0);
       lucroPayments.mensal = lucroMensal;
 
-      // Lucro dos aluguéis avulsos (cada avulso = preço "avulso")
-      const lucroAvulso = avulsosData.length * (prices.avulso || 0);
+      const lucroAvulso = payments
+        .filter((p) => p.tipoServico === "Avulso")
+        .reduce((sum, p) => sum + p.valor, 0);
       lucroPayments.avulso = lucroAvulso;
 
       setLucroTotal(lucroPayments);
@@ -150,6 +163,21 @@ export default function ReportsScreen({ navigation }) {
         ganho: prices.avulso || 0,
       }));
       setAvulsos(avulsosFormatted);
+
+      // Aluguéis Atrasados e Pagos
+      const todasReservas = [
+        ...mensalistasData.map((r) => ({ ...r, type: "reserva" })),
+        ...avulsosData.map((r) => ({ ...r, type: "reserva" })),
+        ...anuaisData.map((r) => ({ ...r, type: "reserva" })),
+      ];
+      const { atrasados, pagos } = calcularStatusAlugueis(
+        todasReservas,
+        payments,
+        prices,
+        campos
+      );
+      setAlugueisAtrasados(atrasados);
+      setAlugueisPagos(pagos);
     } catch (error) {
       console.error("ReportsScreen: Erro ao carregar dados:", error);
       Alert.alert(
@@ -216,11 +244,93 @@ export default function ReportsScreen({ navigation }) {
     return atrasados.sort((a, b) => a.nome.localeCompare(b.nome));
   };
 
+  const calcularStatusAlugueis = (reservas, payments, prices, campos) => {
+    const atrasados = [];
+    const pagos = [];
+    const today = new Date();
+
+    reservas.forEach((reserva) => {
+      const lastPayment = payments
+        .filter((p) => p.itemId === reserva.id)
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+
+      const diaCadastro = new Date(reserva.data).getDate();
+      const valorDevido =
+        reserva.tipo === "anual"
+          ? prices.escolinha
+          : reserva.tipo === "mensal"
+          ? prices.turmas
+          : prices.avulso;
+
+      const campoNome =
+        campos.find((c) => c.id === reserva.campoId)?.nome || "Desconhecido";
+
+      if (!lastPayment) {
+        const dataCriacao = new Date(reserva.data);
+        const proximoPagamento = new Date(dataCriacao);
+        proximoPagamento.setMonth(proximoPagamento.getMonth() + 1);
+        proximoPagamento.setDate(1);
+        const ultimoDiaMes = new Date(
+          proximoPagamento.getFullYear(),
+          proximoPagamento.getMonth() + 1,
+          0
+        ).getDate();
+        proximoPagamento.setDate(Math.min(diaCadastro, ultimoDiaMes));
+        if (proximoPagamento < today) {
+          atrasados.push({
+            nome: reserva.nome,
+            tipo: reserva.tipo,
+            data: moment(reserva.data).format("DD/MM/YYYY"),
+            horario: `${reserva.horarioInicio} - ${reserva.horarioFim}`,
+            campo: campoNome,
+            valorDevido,
+          });
+        }
+      } else {
+        const ultimaDataPagamento = new Date(lastPayment.createdAt);
+        const nextPaymentDate = new Date(ultimaDataPagamento);
+        nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
+        nextPaymentDate.setDate(1);
+        const ultimoDiaMes = new Date(
+          nextPaymentDate.getFullYear(),
+          nextPaymentDate.getMonth() + 1,
+          0
+        ).getDate();
+        nextPaymentDate.setDate(Math.min(diaCadastro, ultimoDiaMes));
+        if (nextPaymentDate < today) {
+          atrasados.push({
+            nome: reserva.nome,
+            tipo: reserva.tipo,
+            data: moment(reserva.data).format("DD/MM/YYYY"),
+            horario: `${reserva.horarioInicio} - ${reserva.horarioFim}`,
+            campo: campoNome,
+            valorDevido,
+          });
+        } else {
+          pagos.push({
+            nome: reserva.nome,
+            tipo: reserva.tipo,
+            data: moment(reserva.data).format("DD/MM/YYYY"),
+            horario: `${reserva.horarioInicio} - ${reserva.horarioFim}`,
+            campo: campoNome,
+            valorPago: lastPayment.valor,
+            dataPagamento: moment(lastPayment.createdAt).format("DD/MM/YYYY"),
+          });
+        }
+      }
+    });
+
+    return {
+      atrasados: atrasados.sort((a, b) => a.nome.localeCompare(b.nome)),
+      pagos: pagos.sort((a, b) => a.nome.localeCompare(b.nome)),
+    };
+  };
+
   useEffect(() => {
     fetchData();
 
     const unsubscribe = navigation.addListener("focus", () => {
-      ("ReportsScreen: Tela em foco, recarregando dados...");
+      console.log("ReportsScreen: Tela em foco, recarregando dados...");
       fetchData();
     });
 
@@ -272,6 +382,24 @@ export default function ReportsScreen({ navigation }) {
             `"${a.nome}";"${a.data}";"${a.campo}";"${
               a.horario
             }";"${a.ganho.toFixed(2)}"`
+        ),
+        "",
+        '"Aluguéis Atrasados"',
+        '"Nome";"Tipo";"Data";"Horário";"Campo";"Valor Devido (R$)"',
+        ...alugueisAtrasados.map(
+          (a) =>
+            `"${a.nome}";"${a.tipo}";"${a.data}";"${a.horario}";"${
+              a.campo
+            }";"${a.valorDevido.toFixed(2)}"`
+        ),
+        "",
+        '"Aluguéis Pagos"',
+        '"Nome";"Tipo";"Data";"Horário";"Campo";"Valor Pago (R$)";"Data Pagamento"',
+        ...alugueisPagos.map(
+          (p) =>
+            `"${p.nome}";"${p.tipo}";"${p.data}";"${p.horario}";"${
+              p.campo
+            }";"${p.valorPago.toFixed(2)}";"${p.dataPagamento}"`
         ),
       ].join("\n");
 
@@ -398,6 +526,34 @@ export default function ReportsScreen({ navigation }) {
           ))
         ) : (
           <Text style={styles.emptyText}>Nenhum aluguel avulso registrado</Text>
+        )}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Aluguéis Atrasados</Text>
+        {alugueisAtrasados.length > 0 ? (
+          alugueisAtrasados.map((a, index) => (
+            <Text key={index} style={styles.itemText}>
+              {a.nome} ({a.tipo}): {a.data}, {a.horario}, {a.campo} - R${" "}
+              {a.valorDevido.toFixed(2)}
+            </Text>
+          ))
+        ) : (
+          <Text style={styles.emptyText}>Nenhum aluguel atrasado</Text>
+        )}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Aluguéis Pagos</Text>
+        {alugueisPagos.length > 0 ? (
+          alugueisPagos.map((p, index) => (
+            <Text key={index} style={styles.itemText}>
+              {p.nome} ({p.tipo}): {p.data}, {p.horario}, {p.campo} - R${" "}
+              {p.valorPago.toFixed(2)} (Pago em {p.dataPagamento})
+            </Text>
+          ))
+        ) : (
+          <Text style={styles.emptyText}>Nenhum aluguel pago</Text>
         )}
       </View>
 

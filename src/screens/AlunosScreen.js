@@ -1,4 +1,3 @@
-// src/screens/AlunosScreen.js
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -12,7 +11,8 @@ import {
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { alunoService } from "../services/alunoService";
-import { escolinhaService } from "../services/escolinhaService";
+import { db } from "../services/firebaseService";
+import { collection, query, getDocs, where } from "firebase/firestore";
 
 export default function AlunosScreen({ navigation }) {
   const [alunos, setAlunos] = useState([]);
@@ -30,17 +30,28 @@ export default function AlunosScreen({ navigation }) {
 
   const fetchData = async () => {
     try {
+      // Carregar alunos
       const alunosData = await alunoService.getAlunos();
-      const aulasData = await escolinhaService.getAulas();
       setAlunos(alunosData);
 
+      // Carregar reservas anuais do Firestore
+      const reservasRef = collection(db, "reservas");
+      const q = query(reservasRef, where("tipo", "==", "anual"));
+      const querySnapshot = await getDocs(q);
+      const reservasAnuais = [];
+      querySnapshot.forEach((doc) => {
+        reservasAnuais.push({ id: doc.id, ...doc.data() });
+      });
+
+      // Extrair responsáveis únicos das reservas anuais como "professores/turmas"
       const professoresUnicos = [
-        ...new Set(aulasData.map((aula) => aula.responsavel)),
+        ...new Set(reservasAnuais.map((reserva) => reserva.responsavel)),
       ].filter(Boolean);
       setProfessores(professoresUnicos);
 
-      if (professoresUnicos.length > 0) {
+      if (professoresUnicos.length > 0 && !professorSelecionado) {
         setProfessorSelecionado(professoresUnicos[0]);
+        setTurma(professoresUnicos[0]); // Definir turma inicial
       }
     } catch (error) {
       console.error("Erro ao carregar dados:", error);
@@ -53,13 +64,12 @@ export default function AlunosScreen({ navigation }) {
 
     // Listener de foco para recarregar ao voltar para a tela
     const unsubscribe = navigation.addListener("focus", () => {
-      ("AlunosScreen: Tela em foco, recarregando dados...");
+      console.log("AlunosScreen: Tela em foco, recarregando dados...");
       fetchData();
     });
 
-    // Limpa o listener ao desmontar
     return unsubscribe;
-  }, [navigation]); // Dependência: navigation
+  }, [navigation]);
 
   const alunosFiltrados = professorSelecionado
     ? alunos
@@ -100,7 +110,7 @@ export default function AlunosScreen({ navigation }) {
           telefoneResponsavel,
           idade: parseInt(idade),
           turma,
-          createdAt: alunoSelecionado.createdAt, // Preserva o createdAt original
+          createdAt: alunoSelecionado.createdAt,
         });
       } else {
         await alunoService.addAluno({
@@ -109,11 +119,9 @@ export default function AlunosScreen({ navigation }) {
           telefoneResponsavel,
           idade: parseInt(idade),
           turma,
-          // createdAt será adicionado automaticamente no alunoService
         });
       }
-      const alunosData = await alunoService.getAlunos();
-      setAlunos(alunosData);
+      await fetchData(); // Recarregar dados após salvar
       setModalVisible(false);
     } catch (error) {
       console.error("Erro ao salvar aluno:", error);
@@ -140,8 +148,7 @@ export default function AlunosScreen({ navigation }) {
         onPress: async () => {
           try {
             await alunoService.deleteAluno(id);
-            const alunosData = await alunoService.getAlunos();
-            setAlunos(alunosData);
+            await fetchData(); // Recarregar dados após exclusão
           } catch (error) {
             console.error("Erro ao excluir aluno:", error);
             Alert.alert("Erro", "Não foi possível excluir o aluno.");
@@ -188,7 +195,7 @@ export default function AlunosScreen({ navigation }) {
       <Text>Responsável: {item.responsavel}</Text>
       <Text>Telefone: {item.telefoneResponsavel}</Text>
       <Text>Idade: {item.idade}</Text>
-      {/* Opcional: exibir createdAt na lista de alunos */}
+      <Text>Turma: {item.turma}</Text>
       <Text>
         Data de Cadastro:{" "}
         {item.createdAt
@@ -210,7 +217,9 @@ export default function AlunosScreen({ navigation }) {
           showsVerticalScrollIndicator={false}
           style={styles.professorList}
           ListEmptyComponent={
-            <Text style={styles.emptyText}>Nenhum professor cadastrado.</Text>
+            <Text style={styles.emptyText}>
+              Nenhuma turma anual cadastrada.
+            </Text>
           }
         />
       </View>
@@ -276,14 +285,14 @@ export default function AlunosScreen({ navigation }) {
               keyboardType="numeric"
             />
             <View style={styles.pickerContainer}>
-              <Text style={styles.pickerLabel}>Professor (Turma):</Text>
+              <Text style={styles.pickerLabel}>Turma (Professor):</Text>
               <Picker
                 selectedValue={turma}
                 onValueChange={(itemValue) => setTurma(itemValue)}
                 style={styles.picker}
               >
                 {professores.length === 0 ? (
-                  <Picker.Item label="Nenhum professor disponível" value="" />
+                  <Picker.Item label="Nenhuma turma disponível" value="" />
                 ) : (
                   professores.map((professor) => (
                     <Picker.Item

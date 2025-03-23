@@ -189,23 +189,30 @@ export default function HomeScreen({ navigation, route }) {
     }
   };
 
-  const checkPaymentStatus = (items, payments, currentMode) => {
-    if (!payments || !Array.isArray(payments)) {
-      "HomeScreen: Dados de pagamentos inválidos ou ausentes:", payments;
-      return null;
-    }
-    if (!items || !Array.isArray(items)) {
-      "HomeScreen: Dados de turmas/alunos inválidos ou ausentes:", items;
-      return null;
-    }
+  const checkPaymentStatus = async (items, payments, currentMode) => {
+    if (!payments || !Array.isArray(payments)) return null;
+    if (!items || !Array.isArray(items)) return null;
 
-    `HomeScreen: Verificando atrasos no modo ${currentMode} com ${items.length} itens`;
+    // Buscar reservas do Firestore
+    const reservasRef = collection(db, "reservas");
+    const q = query(reservasRef);
+    const querySnapshot = await getDocs(q);
+    const reservasData = querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+      type: "reserva",
+    }));
 
-    for (const item of items) {
-      if (!item || !item.type || !item.createdAt) {
-        "HomeScreen: Item inválido, faltando type ou createdAt:", item;
-        continue;
-      }
+    const todosItens = [
+      ...items,
+      ...reservasData.map((reserva) => ({
+        ...reserva,
+        createdAt: reserva.data, // Usar 'data' como createdAt para reservas
+      })),
+    ];
+
+    for (const item of todosItens) {
+      if (!item || !item.type || !item.createdAt) continue;
 
       const lastPayment = payments
         .filter((p) => p.itemId === item.id)
@@ -213,10 +220,6 @@ export default function HomeScreen({ navigation, route }) {
 
       const diaCadastro = new Date(item.createdAt).getDate();
       const today = new Date();
-
-      `HomeScreen: Verificando item ${item.nome || item.id}, type: ${
-        item.type
-      }, createdAt: ${item.createdAt}`;
 
       if (!lastPayment) {
         const dataCriacao = new Date(item.createdAt);
@@ -229,13 +232,15 @@ export default function HomeScreen({ navigation, route }) {
           0
         ).getDate();
         proximoPagamento.setDate(Math.min(diaCadastro, ultimoDiaMes));
-        `HomeScreen: Sem pagamento, próximo pagamento em ${proximoPagamento}`;
         if (
           proximoPagamento < today &&
-          ((currentMode === "turmas" && item.type !== "aluno") ||
-            (currentMode === "escolinha" && item.type === "aluno"))
+          ((currentMode === "turmas" &&
+            (item.type === "turma" ||
+              item.tipo === "mensal" ||
+              item.tipo === "avulso")) ||
+            (currentMode === "escolinha" &&
+              (item.type === "aluno" || item.tipo === "anual")))
         ) {
-          `HomeScreen: Atraso detectado para ${item.nome || item.id}`;
           return item;
         }
       } else {
@@ -249,18 +254,19 @@ export default function HomeScreen({ navigation, route }) {
           0
         ).getDate();
         nextPaymentDate.setDate(Math.min(diaCadastro, ultimoDiaMes));
-        `HomeScreen: Último pagamento em ${ultimaDataPagamento}, próximo em ${nextPaymentDate}`;
         if (
           nextPaymentDate < today &&
-          ((currentMode === "turmas" && item.type !== "aluno") ||
-            (currentMode === "escolinha" && item.type === "aluno"))
+          ((currentMode === "turmas" &&
+            (item.type === "turma" ||
+              item.tipo === "mensal" ||
+              item.tipo === "avulso")) ||
+            (currentMode === "escolinha" &&
+              (item.type === "aluno" || item.tipo === "anual")))
         ) {
-          `HomeScreen: Atraso detectado para ${item.nome || item.id}`;
           return item;
         }
       }
     }
-    ("HomeScreen: Nenhum atraso encontrado");
     return null;
   };
 

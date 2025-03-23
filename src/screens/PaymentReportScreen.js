@@ -175,10 +175,11 @@ export default function PaymentReportScreen({ navigation, route }) {
       .filter((p) => p.itemId === item.id)
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
 
-    const diaCadastro = new Date(item.createdAt).getDate();
+    const dataBase = item.type === "reserva" ? item.data : item.createdAt;
+    const diaCadastro = new Date(dataBase).getDate();
 
     if (!lastPayment) {
-      const dataCriacao = new Date(item.createdAt);
+      const dataCriacao = new Date(dataBase);
       const proximoPagamento = new Date(dataCriacao);
       proximoPagamento.setMonth(proximoPagamento.getMonth() + 1);
       proximoPagamento.setDate(1);
@@ -223,7 +224,11 @@ export default function PaymentReportScreen({ navigation, route }) {
         createdAt: new Date().toISOString(),
       };
       await paymentService.addPayment(newPayment);
-      await fetchData();
+
+      // Atualizar o estado payments localmente
+      setPayments((prevPayments) => [...prevPayments, newPayment]);
+
+      await fetchData(); // Ainda recarrega do backend para consistência
       setModalVisible(false);
       setValor("");
       alert(`Pagamento registrado para ${selectedItem.nome}!`);
@@ -232,7 +237,6 @@ export default function PaymentReportScreen({ navigation, route }) {
       alert("Erro ao registrar o pagamento.");
     }
   };
-
   const handleEditItem = () => {
     if (!selectedItem) return;
     navigation.navigate(

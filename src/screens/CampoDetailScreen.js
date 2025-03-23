@@ -1,4 +1,3 @@
-// src/screens/CampoDetailScreen.js
 import React, { useState, useEffect, useRef } from "react";
 import {
   StyleSheet,
@@ -60,10 +59,10 @@ export default function CampoDetailScreen({ route, navigation }) {
         (t) => t.campoId === campo.id
       );
       const aulasFiltradas = updatedAulas.filter((a) => a.campoId === campo.id);
-      // Não filtramos mais por semana aqui, pois reservas mensais se repetem
-      "CampoDetailScreen: Turmas filtradas:", turmasFiltradas;
-      "CampoDetailScreen: Aulas filtradas:", aulasFiltradas;
-      "CampoDetailScreen: Reservas carregadas:", reservas;
+
+      console.log("CampoDetailScreen: Turmas filtradas:", turmasFiltradas);
+      console.log("CampoDetailScreen: Aulas filtradas:", aulasFiltradas);
+      console.log("CampoDetailScreen: Reservas carregadas:", reservas);
 
       setTurmasDoCampo(turmasFiltradas);
       setAulasDoCampo(aulasFiltradas);
@@ -85,7 +84,7 @@ export default function CampoDetailScreen({ route, navigation }) {
       querySnapshot.forEach((doc) => {
         reservas.push({ id: doc.id, ...doc.data() });
       });
-      "CampoDetailScreen: Reservas do dia carregadas:", reservas;
+      console.log("CampoDetailScreen: Reservas do Firestore:", reservas);
       return reservas;
     } catch (error) {
       console.error("Erro ao buscar reservas do Firestore:", error);
@@ -106,16 +105,18 @@ export default function CampoDetailScreen({ route, navigation }) {
           .format("dddd")
           .toLowerCase()
           .replace("-feira", "");
-        const isSameWeek = moment(reserva.data).isSame(moment(), "week");
         const matchesDay = diaReserva === diaSelecionado;
-        // Para reservas mensais, ignoramos a data específica e repetimos semanalmente
-        const isMensal = reserva.tipo === "mensal";
-        `CampoDetailScreen: Filtrando reserva ${reserva.id} - Data: ${
-          reserva.data
-        }, Dia: ${diaReserva}, Semana Atual: ${isSameWeek}, Dia Selecionado: ${diaSelecionado}, Tipo: ${
-          reserva.tipo
-        }, Matches: ${isMensal ? matchesDay : matchesDay && isSameWeek}`;
-        return isMensal ? matchesDay : matchesDay && isSameWeek;
+        const isSameWeek = moment(reserva.data).isSame(moment(), "week");
+
+        // Lógica de filtragem por tipo de reserva e modo
+        if (reserva.tipo === "avulso" || reserva.tipo === "mensal") {
+          // Avulsas e Mensais aparecem apenas no modo "turmas"
+          return mode === "turmas" && matchesDay && isSameWeek;
+        } else if (reserva.tipo === "anual") {
+          // Anuais aparecem apenas no modo "escolinha" e na semana atual
+          return mode === "escolinha" && matchesDay && isSameWeek;
+        }
+        return false;
       })
       .map((reserva) => ({
         ...reserva,
@@ -128,7 +129,7 @@ export default function CampoDetailScreen({ route, navigation }) {
       a.horarioInicio?.localeCompare(b.horarioInicio)
   );
 
-  "CampoDetailScreen: Itens do dia para renderizar:", itensDoDia;
+  console.log("CampoDetailScreen: Itens do dia para renderizar:", itensDoDia);
 
   const calcularHorariosDisponiveis = (inicio, fim, itensOcupados) => {
     const horarios = [];
@@ -188,10 +189,15 @@ export default function CampoDetailScreen({ route, navigation }) {
             .format("dddd")
             .toLowerCase()
             .replace("-feira", "");
-          const isSameWeek = moment(reserva.data).isSame(moment(), "week");
           const matchesDay = diaReserva === diaSelecionado;
-          const isMensal = reserva.tipo === "mensal";
-          return isMensal ? matchesDay : matchesDay && isSameWeek;
+          const isSameWeek = moment(reserva.data).isSame(moment(), "week");
+
+          if (reserva.tipo === "avulso" || reserva.tipo === "mensal") {
+            return mode === "turmas" && matchesDay && isSameWeek;
+          } else if (reserva.tipo === "anual") {
+            return mode === "escolinha" && matchesDay && isSameWeek;
+          }
+          return false;
         })
         .map((reserva) => ({
           inicio: reserva.horarioInicio,
@@ -214,6 +220,7 @@ export default function CampoDetailScreen({ route, navigation }) {
     reservasDoFirestore,
     diaSelecionado,
     horarioFuncionamento,
+    mode,
   ]);
 
   const formatarDataCriacao = (createdAt) => {
@@ -287,7 +294,7 @@ export default function CampoDetailScreen({ route, navigation }) {
       inicio: horario.inicio,
       fim: horario.fim,
       mode,
-      tipo: "mensal", // Força reservas como mensais
+      tipo: "mensal",
     });
   };
 
