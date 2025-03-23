@@ -431,7 +431,6 @@ export default function CalendarioScreen({ navigation }) {
   }, []);
 
   const handleSaveEdit = async () => {
-    ("CalendarioScreen: handleSaveEdit iniciado");
     if (
       !editNome ||
       !editResponsavel ||
@@ -439,7 +438,6 @@ export default function CalendarioScreen({ navigation }) {
       !editHorarioInicio ||
       !editHorarioFim
     ) {
-      ("CalendarioScreen: Campos obrigatórios faltando");
       Alert.alert("Erro", "Preencha todos os campos!");
       return;
     }
@@ -447,7 +445,6 @@ export default function CalendarioScreen({ navigation }) {
       !moment(editHorarioInicio, "HH:mm", true).isValid() ||
       !moment(editHorarioFim, "HH:mm", true).isValid()
     ) {
-      ("CalendarioScreen: Formato de horário inválido");
       Alert.alert(
         "Erro",
         "Horários devem estar no formato HH:mm (ex.: 17:00)!"
@@ -463,7 +460,6 @@ export default function CalendarioScreen({ navigation }) {
         selectedReserva.id
       )
     ) {
-      ("CalendarioScreen: Conflito de horário detectado");
       Alert.alert(
         "Erro",
         "Conflito de horário! Já existe uma reserva nesse intervalo."
@@ -483,18 +479,17 @@ export default function CalendarioScreen({ navigation }) {
         tipo: selectedReserva.tipo,
         campoId: selectedReserva.campoId,
       };
-      "CalendarioScreen: Atualizando reserva no Firestore:", updatedReserva;
       await updateDoc(reservaRef, updatedReserva);
       const updatedReservas = reservas.map((r) =>
         r.id === selectedReserva.id ? { ...r, ...updatedReserva } : r
       );
-      ("CalendarioScreen: Reservas atualizadas localmente");
       setReservas(updatedReservas);
       setReservasDoDia(await fetchReservasDoDia(selectedDate));
       updateMarkedDates(updatedReservas, selectedDate);
       setEditModalVisible(false);
       setNeedsFetch(true);
-      ("CalendarioScreen: Reserva editada com sucesso");
+      // Sinaliza que ReportsScreen deve atualizar
+      navigation.setParams({ shouldUpdate: true });
     } catch (error) {
       console.error("CalendarioScreen: Erro ao atualizar reserva:", error);
       Alert.alert("Erro", "Não foi possível atualizar a reserva.");
@@ -502,7 +497,6 @@ export default function CalendarioScreen({ navigation }) {
   };
 
   const handleCancelReserva = async (reservaId) => {
-    "CalendarioScreen: handleCancelReserva, reservaId:", reservaId;
     Alert.alert(
       "Confirmar Cancelamento",
       "Tem certeza que deseja cancelar esta reserva?",
@@ -513,17 +507,16 @@ export default function CalendarioScreen({ navigation }) {
           onPress: async () => {
             try {
               const reservaRef = doc(db, "reservas", reservaId);
-              ("CalendarioScreen: Deletando reserva do Firestore");
               await deleteDoc(reservaRef);
               const updatedReservas = reservas.filter(
                 (r) => r.id !== reservaId
               );
-              ("CalendarioScreen: Reservas atualizadas localmente");
               setReservas(updatedReservas);
               setReservasDoDia(await fetchReservasDoDia(selectedDate));
               updateMarkedDates(updatedReservas, selectedDate);
               setNeedsFetch(true);
-              ("CalendarioScreen: Reserva cancelada com sucesso");
+              // Sinaliza que ReportsScreen deve atualizar
+              navigation.setParams({ shouldUpdate: true });
             } catch (error) {
               console.error(
                 "CalendarioScreen: Erro ao cancelar reserva:",
@@ -564,7 +557,6 @@ export default function CalendarioScreen({ navigation }) {
   }, []);
 
   const handleSaveAvulso = async () => {
-    ("CalendarioScreen: handleSaveAvulso iniciado");
     if (
       !avulsoNome ||
       !avulsoResponsavel ||
@@ -572,7 +564,6 @@ export default function CalendarioScreen({ navigation }) {
       !avulsoHorarioInicio ||
       !avulsoHorarioFim
     ) {
-      ("CalendarioScreen: Campos obrigatórios faltando");
       Alert.alert("Erro", "Preencha todos os campos!");
       return;
     }
@@ -580,7 +571,6 @@ export default function CalendarioScreen({ navigation }) {
       !moment(avulsoHorarioInicio, "HH:mm", true).isValid() ||
       !moment(avulsoHorarioFim, "HH:mm", true).isValid()
     ) {
-      ("CalendarioScreen: Formato de horário inválido");
       Alert.alert(
         "Erro",
         "Horários devem estar no formato HH:mm (ex.: 17:00)!"
@@ -589,7 +579,6 @@ export default function CalendarioScreen({ navigation }) {
     }
     const reservasDia = await fetchReservasDoDia(selectedDate);
     if (hasTimeConflict(avulsoHorarioInicio, avulsoHorarioFim, reservasDia)) {
-      ("CalendarioScreen: Conflito de horário detectado");
       Alert.alert(
         "Erro",
         "Conflito de horário! Já existe uma reserva nesse intervalo."
@@ -608,16 +597,15 @@ export default function CalendarioScreen({ navigation }) {
         campoId: selectedCampoId,
         tipo: "avulso",
       };
-      "CalendarioScreen: Salvando reserva avulsa no Firestore:", reserva;
       const docRef = await addDoc(collection(db, "reservas"), reserva);
       const updatedReservas = [...reservas, { id: docRef.id, ...reserva }];
-      ("CalendarioScreen: Reservas atualizadas localmente");
       setReservas(updatedReservas);
       setReservasDoDia(await fetchReservasDoDia(selectedDate));
       updateMarkedDates(updatedReservas, selectedDate);
       setAddAvulsoModalVisible(false);
       setNeedsFetch(true);
-      ("CalendarioScreen: Reserva avulsa salva com sucesso");
+      // Sinaliza que ReportsScreen deve atualizar
+      navigation.setParams({ shouldUpdate: true });
     } catch (error) {
       console.error("CalendarioScreen: Erro ao salvar reserva avulsa:", error);
       Alert.alert("Erro", "Não foi possível salvar a reserva.");
@@ -635,7 +623,6 @@ export default function CalendarioScreen({ navigation }) {
   }, []);
 
   const handleSaveAula = async () => {
-    ("CalendarioScreen: handleSaveAula iniciado");
     setIsSaving(true);
     if (
       !aulaNome ||
@@ -644,7 +631,6 @@ export default function CalendarioScreen({ navigation }) {
       !aulaHorarioInicio ||
       !aulaHorarioFim
     ) {
-      ("CalendarioScreen: Campos obrigatórios faltando");
       Alert.alert("Erro", "Preencha todos os campos!");
       setIsSaving(false);
       return;
@@ -653,7 +639,6 @@ export default function CalendarioScreen({ navigation }) {
       !moment(aulaHorarioInicio, "HH:mm", true).isValid() ||
       !moment(aulaHorarioFim, "HH:mm", true).isValid()
     ) {
-      ("CalendarioScreen: Formato de horário inválido");
       Alert.alert(
         "Erro",
         "Horários devem estar no formato HH:mm (ex.: 17:00)!"
@@ -662,7 +647,6 @@ export default function CalendarioScreen({ navigation }) {
       return;
     }
     if (aulaHorarioInicio === aulaHorarioFim) {
-      ("CalendarioScreen: Horário de início e fim iguais");
       Alert.alert("Erro", "Horário de início e fim não podem ser iguais!");
       setIsSaving(false);
       return;
@@ -682,8 +666,6 @@ export default function CalendarioScreen({ navigation }) {
     while (currentDate.isSameOrBefore(endDate)) {
       if (currentDate.day() === startDate.day()) {
         const dateStr = currentDate.format("YYYY-MM-DD");
-        "CalendarioScreen: Verificando conflitos para", dateStr;
-
         const reservasDia = [
           ...turmas.filter(
             (t) => t.dia === diaSemana && t.campoId === selectedCampoId
@@ -712,8 +694,6 @@ export default function CalendarioScreen({ navigation }) {
         ];
 
         if (hasTimeConflict(aulaHorarioInicio, aulaHorarioFim, reservasDia)) {
-          "CalendarioScreen: Conflito de horário em",
-            currentDate.format("YYYY-MM-DD");
           Alert.alert(
             "Erro",
             `Conflito de horário no dia ${currentDate.format("DD/MM/YYYY")}!`
@@ -736,16 +716,15 @@ export default function CalendarioScreen({ navigation }) {
         campoId: selectedCampoId,
         tipo: "anual",
       };
-      "CalendarioScreen: Salvando reserva anual no Firestore:", reserva;
       const docRef = await addDoc(collection(db, "reservas"), reserva);
       const updatedReservas = [...reservas, { id: docRef.id, ...reserva }];
-      ("CalendarioScreen: Reservas atualizadas localmente");
       setReservas(updatedReservas);
       setReservasDoDia(await fetchReservasDoDia(selectedDate));
       updateMarkedDates(updatedReservas, selectedDate);
       setAddAulaModalVisible(false);
       setNeedsFetch(true);
-      ("CalendarioScreen: Reserva anual salva com sucesso");
+      // Sinaliza que ReportsScreen deve atualizar
+      navigation.setParams({ shouldUpdate: true });
     } catch (error) {
       console.error("CalendarioScreen: Erro ao salvar reserva anual:", error);
       Alert.alert("Erro", "Não foi possível salvar a reserva.");
@@ -779,7 +758,6 @@ export default function CalendarioScreen({ navigation }) {
   }, [selectedRentalDates]);
 
   const handleSaveRental = async () => {
-    ("CalendarioScreen: handleSaveRental iniciado");
     if (
       !rentalNome ||
       !rentalResponsavel ||
@@ -787,7 +765,6 @@ export default function CalendarioScreen({ navigation }) {
       !rentalHorarioInicio ||
       !rentalHorarioFim
     ) {
-      ("CalendarioScreen: Campos obrigatórios faltando");
       Alert.alert("Erro", "Preencha todos os campos!");
       return;
     }
@@ -795,7 +772,6 @@ export default function CalendarioScreen({ navigation }) {
       !moment(rentalHorarioInicio, "HH:mm", true).isValid() ||
       !moment(rentalHorarioFim, "HH:mm", true).isValid()
     ) {
-      ("CalendarioScreen: Formato de horário inválido");
       Alert.alert(
         "Erro",
         "Horários devem estar no formato HH:mm (ex.: 17:00)!"
@@ -810,7 +786,6 @@ export default function CalendarioScreen({ navigation }) {
         if (
           hasTimeConflict(rentalHorarioInicio, rentalHorarioFim, reservasDia)
         ) {
-          "CalendarioScreen: Conflito de horário em", date;
           Alert.alert(
             "Erro",
             `Conflito de horário no dia ${moment(date).format("DD/MM/YYYY")}!`
@@ -831,20 +806,19 @@ export default function CalendarioScreen({ navigation }) {
           campoId: selectedCampoId,
           tipo: "avulso",
         };
-        "CalendarioScreen: Salvando reserva de aluguel:", reserva;
         const docRef = await addDoc(collection(db, "reservas"), reserva);
         newReservas.push({ id: docRef.id, ...reserva });
       }
 
       const updatedReservas = [...reservas, ...newReservas];
-      ("CalendarioScreen: Reservas atualizadas localmente");
       setReservas(updatedReservas);
       updateMarkedDates(updatedReservas, selectedDate);
       setSelectedRentalDates({});
       setSelectionMode(false);
       setAddRentalModalVisible(false);
       setNeedsFetch(true);
-      ("CalendarioScreen: Reservas de aluguel salvas com sucesso");
+      // Sinaliza que ReportsScreen deve atualizar
+      navigation.setParams({ shouldUpdate: true });
     } catch (error) {
       console.error(
         "CalendarioScreen: Erro ao salvar reservas de aluguel:",

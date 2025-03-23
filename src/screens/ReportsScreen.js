@@ -15,28 +15,40 @@ import { alunoService } from "../services/alunoService";
 import { priceService } from "../services/priceService";
 import { campoService } from "../services/campoService";
 import { db } from "../services/firebaseService";
-import { collection, query, getDocs } from "firebase/firestore";
+import {
+  collection,
+  query,
+  getDocs,
+  doc,
+  onSnapshot,
+} from "firebase/firestore";
 import moment from "moment";
 
-export default function ReportsScreen({ navigation }) {
+export default function ReportsScreen({ navigation, route }) {
+  const [quantidadeAlunos, setQuantidadeAlunos] = useState(0);
+  const [quantidadeMensalistas, setQuantidadeMensalistas] = useState(0);
+  const [valorMensalAlunos, setValorMensalAlunos] = useState(0);
+  const [valorMensalMensalistas, setValorMensalMensalistas] = useState(0);
+  const [atrasos, setAtrasos] = useState([]);
   const [lucroTotal, setLucroTotal] = useState({
-    turmas: 0,
-    escolinha: 0,
+    anual: 0,
+    mensal: 0,
+    avulso: 0,
+    primeiraReserva: null,
+  });
+  const [mediaMensalLucro, setMediaMensalLucro] = useState({
+    anual: 0,
     mensal: 0,
     avulso: 0,
   });
-  const [turmasLucro, setTurmasLucro] = useState([]);
-  const [horariosLucro, setHorariosLucro] = useState([]);
-  const [diasCheios, setDiasCheios] = useState([]);
-  const [atrasos, setAtrasos] = useState([]);
-  const [mensalistas, setMensalistas] = useState([]);
-  const [avulsos, setAvulsos] = useState([]);
-  const [alugueisAtrasados, setAlugueisAtrasados] = useState([]);
-  const [alugueisPagos, setAlugueisPagos] = useState([]);
+  const [horariosDisponiveis, setHorariosDisponiveis] = useState([]);
+  const [horarioOperacao, setHorarioOperacao] = useState({
+    inicio: "09:00",
+    fim: "22:00",
+  });
 
   const fetchData = async () => {
     try {
-      ("ReportsScreen: Iniciando busca de dados");
       const payments = await paymentService.getPayments();
       const turmas = await turmaService.getTurmas();
       const alunos = await alunoService.getAlunos();
@@ -48,133 +60,71 @@ export default function ReportsScreen({ navigation }) {
         ...doc.data(),
       }));
 
-      "ReportsScreen: Reservas encontradas:", reservas.length;
+      setQuantidadeAlunos(alunos.length);
+      setQuantidadeMensalistas(turmas.length);
+      setValorMensalAlunos(alunos.length * prices.escolinha);
+      setValorMensalMensalistas(turmas.length * prices.turmas);
 
-      // Separar reservas por tipo
-      const mensalistasData = reservas.filter((r) => r.tipo === "mensal");
-      const avulsosData = reservas.filter((r) => r.tipo === "avulso");
-      const anuaisData = reservas.filter((r) => r.tipo === "anual");
-
-      "ReportsScreen: Mensalistas encontrados:", mensalistasData.length;
-      "ReportsScreen: Avulsos encontrados:", avulsosData.length;
-      "ReportsScreen: Anuais encontrados:", anuaisData.length;
-
-      // Calcular lucro total
-      const lucroPayments = payments.reduce(
-        (acc, payment) => {
-          const tipoServico = payment.tipoServico
-            ? payment.tipoServico.toLowerCase()
-            : "desconhecido";
-          if (["turmas", "escolinha"].includes(tipoServico)) {
-            acc[tipoServico] += payment.valor;
-          } else if (tipoServico === "avulso") {
-            acc.avulso += payment.valor;
-          }
-          return acc;
-        },
-        { turmas: 0, escolinha: 0, mensal: 0, avulso: 0 }
-      );
-
-      const lucroMensal = mensalistasData.reduce((sum, m) => {
-        const lastPayment = payments
-          .filter((p) => p.itemId === m.id)
-          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
-        return lastPayment ? sum + prices.turmas : sum;
-      }, 0);
-      lucroPayments.mensal = lucroMensal;
-
-      const lucroAvulso = payments
-        .filter((p) => p.tipoServico === "Avulso")
-        .reduce((sum, p) => sum + p.valor, 0);
-      lucroPayments.avulso = lucroAvulso;
-
-      setLucroTotal(lucroPayments);
-
-      // Lucro por turma
-      const turmasLucroData = turmas
-        .map((turma) => {
-          const turmaPayments = payments.filter(
-            (p) => p.itemId === turma.id && p.tipoServico === "Turmas"
-          );
-          const total = turmaPayments.reduce((sum, p) => sum + p.valor, 0);
-          return { nome: turma.nome, total };
-        })
-        .sort((a, b) => b.total - a.total);
-      setTurmasLucro(turmasLucroData);
-
-      // Lucro por horário
-      const horariosLucroData = turmas.reduce((acc, turma) => {
-        const horario = `${turma.inicio} - ${turma.fim}`;
-        const turmaPayments = payments.filter(
-          (p) => p.itemId === turma.id && p.tipoServico === "Turmas"
-        );
-        const total = turmaPayments.reduce((sum, p) => sum + p.valor, 0);
-        acc[horario] = (acc[horario] || 0) + total;
-        return acc;
-      }, {});
-      const horariosArray = Object.entries(horariosLucroData)
-        .map(([horario, total]) => ({ horario, total }))
-        .sort((a, b) => b.total - a.total);
-      setHorariosLucro(horariosArray);
-
-      // Dias mais cheios
-      const diasCheiosData = turmas.reduce((acc, turma) => {
-        acc[turma.dia] = (acc[turma.dia] || 0) + 1;
-        return acc;
-      }, {});
-      const diasArray = Object.entries(diasCheiosData)
-        .map(([dia, count]) => ({ dia, count }))
-        .sort((a, b) => b.count - a.count);
-      setDiasCheios(diasArray);
-
-      // Turmas e Alunos em atraso
-      const turmasComType = turmas.map((turma) => ({
-        ...turma,
-        type: "turma",
-      }));
-      const alunosComType = alunos.map((aluno) => ({
-        ...aluno,
-        type: "aluno",
-      }));
-      const todosItens = [...turmasComType, ...alunosComType];
+      const todosItens = [
+        ...turmas.map((t) => ({ ...t, type: "turma" })),
+        ...alunos.map((a) => ({ ...a, type: "aluno" })),
+        ...reservas.map((r) => ({ ...r, type: "reserva" })),
+      ];
       const atrasosData = calcularAtrasos(todosItens, payments, prices);
       setAtrasos(atrasosData);
 
-      // Dados dos aluguéis mensais
-      const mensalistasFormatted = mensalistasData.map((m) => ({
-        nome: m.nome,
-        dataInicio: moment(m.data).format("DD/MM/YYYY"),
-        dataFim: moment(m.data).add(1, "month").format("DD/MM/YYYY"),
-        campo: campos.find((c) => c.id === m.campoId)?.nome || "Desconhecido",
-        horario: `${m.horarioInicio} - ${m.horarioFim}`,
-        ganho: prices.turmas || 0,
-      }));
-      setMensalistas(mensalistasFormatted);
+      const lucroAnual = payments
+        .filter((p) => p.tipoServico === "Escolinha")
+        .reduce((sum, p) => sum + Math.max(p.valor, 0), 0);
+      const lucroMensal = payments
+        .filter((p) => p.tipoServico === "Turmas")
+        .reduce((sum, p) => sum + Math.max(p.valor, 0), 0);
+      const lucroAvulso = payments
+        .filter((p) => p.tipoServico === "Avulso")
+        .reduce((sum, p) => sum + Math.max(p.valor, 0), 0);
 
-      // Dados dos aluguéis avulsos
-      const avulsosFormatted = avulsosData.map((a) => ({
-        nome: a.nome,
-        data: moment(a.data).format("DD/MM/YYYY"),
-        campo: campos.find((c) => c.id === a.campoId)?.nome || "Desconhecido",
-        horario: `${a.horarioInicio} - ${a.horarioFim}`,
-        ganho: prices.avulso || 0,
-      }));
-      setAvulsos(avulsosFormatted);
-
-      // Aluguéis Atrasados e Pagos
-      const todasReservas = [
-        ...mensalistasData.map((r) => ({ ...r, type: "reserva" })),
-        ...avulsosData.map((r) => ({ ...r, type: "reserva" })),
-        ...anuaisData.map((r) => ({ ...r, type: "reserva" })),
-      ];
-      const { atrasados, pagos } = calcularStatusAlugueis(
-        todasReservas,
-        payments,
-        prices,
-        campos
+      const reservasOrdenadas = reservas.sort(
+        (a, b) => moment(a.data).valueOf() - moment(b.data).valueOf()
       );
-      setAlugueisAtrasados(atrasados);
-      setAlugueisPagos(pagos);
+      const primeiraReserva = reservasOrdenadas.length
+        ? moment(reservasOrdenadas[0].data).format("DD/MM/YYYY")
+        : null;
+
+      setLucroTotal({
+        anual: lucroAnual,
+        mensal: lucroMensal,
+        avulso: lucroAvulso,
+        primeiraReserva: primeiraReserva,
+      });
+
+      if (primeiraReserva) {
+        const dataPrimeiraReserva = moment(reservasOrdenadas[0].data);
+        const dataAtual = moment("2025-03-23");
+        let mesesDiferenca = 0;
+        let currentDate = dataPrimeiraReserva.clone().startOf("month");
+        while (currentDate.isBefore(dataAtual.startOf("month"))) {
+          mesesDiferenca++;
+          currentDate.add(1, "month");
+        }
+        mesesDiferenca = Math.max(mesesDiferenca, 1);
+
+        setMediaMensalLucro({
+          anual: lucroAnual / mesesDiferenca,
+          mensal: lucroMensal / mesesDiferenca,
+          avulso: lucroAvulso / mesesDiferenca,
+        });
+      } else {
+        setMediaMensalLucro({ anual: 0, mensal: 0, avulso: 0 });
+      }
+
+      const horarios = calcularHorariosDisponiveis(
+        turmas,
+        alunos,
+        reservas,
+        campos,
+        prices
+      );
+      setHorariosDisponiveis(horarios);
     } catch (error) {
       console.error("ReportsScreen: Erro ao carregar dados:", error);
       Alert.alert(
@@ -182,6 +132,141 @@ export default function ReportsScreen({ navigation }) {
         "Não foi possível carregar os dados para os relatórios."
       );
     }
+  };
+
+  const calcularHorariosDisponiveis = (
+    turmas,
+    alunos,
+    reservas,
+    campos,
+    prices
+  ) => {
+    const today = moment("2025-03-23");
+    const startOfMonth = today.clone().startOf("month");
+    const endOfMonth = today.clone().endOf("month");
+    const horariosOcupados = {};
+
+    turmas.forEach((turma) => {
+      const diaSemana = turma.dia.toLowerCase().replace("-feira", "");
+      let currentDate = startOfMonth.clone();
+      while (currentDate.isSameOrBefore(endOfMonth)) {
+        if (
+          currentDate.format("dddd").toLowerCase().replace("-feira", "") ===
+          diaSemana
+        ) {
+          const dateStr = currentDate.format("YYYY-MM-DD");
+          const campoId = turma.campoId;
+          if (!horariosOcupados[dateStr]) horariosOcupados[dateStr] = {};
+          if (!horariosOcupados[dateStr][campoId])
+            horariosOcupados[dateStr][campoId] = [];
+          horariosOcupados[dateStr][campoId].push({
+            inicio: turma.inicio,
+            fim: turma.fim,
+          });
+        }
+        currentDate.add(1, "day");
+      }
+    });
+
+    reservas.forEach((reserva) => {
+      const dataInicial = moment(reserva.data);
+      const campoId = reserva.campoId;
+      if (reserva.tipo === "mensal") {
+        const diaSemana = dataInicial.day();
+        let currentDate = startOfMonth.clone();
+        while (currentDate.isSameOrBefore(endOfMonth)) {
+          if (
+            currentDate.day() === diaSemana &&
+            currentDate.isBetween(
+              dataInicial,
+              dataInicial.clone().add(1, "month"),
+              null,
+              "[]"
+            )
+          ) {
+            const dateStr = currentDate.format("YYYY-MM-DD");
+            if (!horariosOcupados[dateStr]) horariosOcupados[dateStr] = {};
+            if (!horariosOcupados[dateStr][campoId])
+              horariosOcupados[dateStr][campoId] = [];
+            horariosOcupados[dateStr][campoId].push({
+              inicio: reserva.horarioInicio,
+              fim: reserva.horarioFim,
+            });
+          }
+          currentDate.add(1, "day");
+        }
+      } else if (reserva.tipo === "avulso") {
+        const dateStr = dataInicial.format("YYYY-MM-DD");
+        if (dataInicial.isBetween(startOfMonth, endOfMonth, null, "[]")) {
+          if (!horariosOcupados[dateStr]) horariosOcupados[dateStr] = {};
+          if (!horariosOcupados[dateStr][campoId])
+            horariosOcupados[dateStr][campoId] = [];
+          horariosOcupados[dateStr][campoId].push({
+            inicio: reserva.horarioInicio,
+            fim: reserva.horarioFim,
+          });
+        }
+      } else if (reserva.tipo === "anual") {
+        const diaSemana = dataInicial.day();
+        let currentDate = startOfMonth.clone();
+        while (currentDate.isSameOrBefore(endOfMonth)) {
+          if (
+            currentDate.day() === diaSemana &&
+            currentDate.isBetween(
+              dataInicial,
+              dataInicial.clone().add(12, "months"),
+              null,
+              "[]"
+            )
+          ) {
+            const dateStr = currentDate.format("YYYY-MM-DD");
+            if (!horariosOcupados[dateStr]) horariosOcupados[dateStr] = {};
+            if (!horariosOcupados[dateStr][campoId])
+              horariosOcupados[dateStr][campoId] = [];
+            horariosOcupados[dateStr][campoId].push({
+              inicio: reserva.horarioInicio,
+              fim: reserva.horarioFim,
+            });
+          }
+          currentDate.add(1, "day");
+        }
+      }
+    });
+
+    const horasTotaisDia = moment(horarioOperacao.fim, "HH:mm").diff(
+      moment(horarioOperacao.inicio, "HH:mm"),
+      "hours",
+      true
+    );
+    console.log("Horas totais por dia:", horasTotaisDia);
+
+    const horariosDisponiveisData = [];
+    let currentDate = startOfMonth.clone();
+    while (currentDate.isSameOrBefore(endOfMonth)) {
+      const dateStr = currentDate.format("YYYY-MM-DD");
+      campos.forEach((campo) => {
+        const horariosCampo = horariosOcupados[dateStr]?.[campo.id] || [];
+        const diaSemana = currentDate.format("dddd");
+        let horasDisponiveis = horasTotaisDia;
+        horariosCampo.forEach((horario) => {
+          const inicio = moment(horario.inicio, "HH:mm");
+          const fim = moment(horario.fim, "HH:mm");
+          const diffHoras = fim.diff(inicio, "hours", true);
+          horasDisponiveis -= diffHoras;
+        });
+        if (horasDisponiveis > 0) {
+          horariosDisponiveisData.push({
+            data: dateStr,
+            dia: diaSemana,
+            campo: campo.nome,
+            horas: horasDisponiveis.toFixed(1),
+          });
+        }
+      });
+      currentDate.add(1, "day");
+    }
+
+    return horariosDisponiveisData.sort((a, b) => a.data.localeCompare(b.data));
   };
 
   const calcularAtrasos = (items, payments, prices) => {
@@ -193,10 +278,22 @@ export default function ReportsScreen({ navigation }) {
         .filter((p) => p.itemId === item.id)
         .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
 
-      const diaCadastro = new Date(item.createdAt).getDate();
+      const dataBase =
+        item.type === "reserva" ? item.data : item.createdAt || new Date();
+      const diaCadastro = new Date(dataBase).getDate();
+      const valorDevido =
+        item.type === "turma"
+          ? prices.turmas
+          : item.type === "aluno"
+          ? prices.escolinha
+          : item.type === "reserva" && item.tipo === "anual"
+          ? prices.escolinha
+          : item.type === "reserva" && item.tipo === "mensal"
+          ? prices.turmas
+          : prices.avulso;
 
       if (!lastPayment) {
-        const dataCriacao = new Date(item.createdAt);
+        const dataCriacao = new Date(dataBase);
         const proximoPagamento = new Date(dataCriacao);
         proximoPagamento.setMonth(proximoPagamento.getMonth() + 1);
         proximoPagamento.setDate(1);
@@ -207,11 +304,18 @@ export default function ReportsScreen({ navigation }) {
         ).getDate();
         proximoPagamento.setDate(Math.min(diaCadastro, ultimoDiaMes));
         if (proximoPagamento < today) {
-          const valorDevido =
-            item.type === "turma" ? prices.turmas : prices.escolinha;
           atrasados.push({
             nome: item.nome,
-            tipo: item.type === "turma" ? "Turma" : "Aluno",
+            tipo:
+              item.type === "turma"
+                ? "Mensalista"
+                : item.type === "aluno"
+                ? "Aluno"
+                : item.tipo === "anual"
+                ? "Anual"
+                : item.tipo === "mensal"
+                ? "Mensal"
+                : "Avulso",
             valorDevido,
           });
         }
@@ -227,11 +331,18 @@ export default function ReportsScreen({ navigation }) {
         ).getDate();
         nextPaymentDate.setDate(Math.min(diaCadastro, ultimoDiaMes));
         if (nextPaymentDate < today) {
-          const valorDevido =
-            item.type === "turma" ? prices.turmas : prices.escolinha;
           atrasados.push({
             nome: item.nome,
-            tipo: item.type === "turma" ? "Turma" : "Aluno",
+            tipo:
+              item.type === "turma"
+                ? "Mensalista"
+                : item.type === "aluno"
+                ? "Aluno"
+                : item.tipo === "anual"
+                ? "Anual"
+                : item.tipo === "mensal"
+                ? "Mensal"
+                : "Avulso",
             valorDevido,
           });
         }
@@ -241,166 +352,100 @@ export default function ReportsScreen({ navigation }) {
     return atrasados.sort((a, b) => a.nome.localeCompare(b.nome));
   };
 
-  const calcularStatusAlugueis = (reservas, payments, prices, campos) => {
-    const atrasados = [];
-    const pagos = [];
-    const today = new Date();
-
-    reservas.forEach((reserva) => {
-      const lastPayment = payments
-        .filter((p) => p.itemId === reserva.id)
-        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
-
-      const diaCadastro = new Date(reserva.data).getDate();
-      const valorDevido =
-        reserva.tipo === "anual"
-          ? prices.escolinha
-          : reserva.tipo === "mensal"
-          ? prices.turmas
-          : prices.avulso;
-
-      const campoNome =
-        campos.find((c) => c.id === reserva.campoId)?.nome || "Desconhecido";
-
-      if (!lastPayment) {
-        const dataCriacao = new Date(reserva.data);
-        const proximoPagamento = new Date(dataCriacao);
-        proximoPagamento.setMonth(proximoPagamento.getMonth() + 1);
-        proximoPagamento.setDate(1);
-        const ultimoDiaMes = new Date(
-          proximoPagamento.getFullYear(),
-          proximoPagamento.getMonth() + 1,
-          0
-        ).getDate();
-        proximoPagamento.setDate(Math.min(diaCadastro, ultimoDiaMes));
-        if (proximoPagamento < today) {
-          atrasados.push({
-            nome: reserva.nome,
-            tipo: reserva.tipo,
-            data: moment(reserva.data).format("DD/MM/YYYY"),
-            horario: `${reserva.horarioInicio} - ${reserva.horarioFim}`,
-            campo: campoNome,
-            valorDevido,
-          });
-        }
-      } else {
-        const ultimaDataPagamento = new Date(lastPayment.createdAt);
-        const nextPaymentDate = new Date(ultimaDataPagamento);
-        nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
-        nextPaymentDate.setDate(1);
-        const ultimoDiaMes = new Date(
-          nextPaymentDate.getFullYear(),
-          nextPaymentDate.getMonth() + 1,
-          0
-        ).getDate();
-        nextPaymentDate.setDate(Math.min(diaCadastro, ultimoDiaMes));
-        if (nextPaymentDate < today) {
-          atrasados.push({
-            nome: reserva.nome,
-            tipo: reserva.tipo,
-            data: moment(reserva.data).format("DD/MM/YYYY"),
-            horario: `${reserva.horarioInicio} - ${reserva.horarioFim}`,
-            campo: campoNome,
-            valorDevido,
-          });
-        } else {
-          pagos.push({
-            nome: reserva.nome,
-            tipo: reserva.tipo,
-            data: moment(reserva.data).format("DD/MM/YYYY"),
-            horario: `${reserva.horarioInicio} - ${reserva.horarioFim}`,
-            campo: campoNome,
-            valorPago: lastPayment.valor,
-            dataPagamento: moment(lastPayment.createdAt).format("DD/MM/YYYY"),
-          });
-        }
-      }
-    });
-
-    return {
-      atrasados: atrasados.sort((a, b) => a.nome.localeCompare(b.nome)),
-      pagos: pagos.sort((a, b) => a.nome.localeCompare(b.nome)),
-    };
-  };
-
   useEffect(() => {
     fetchData();
 
-    const unsubscribe = navigation.addListener("focus", () => {
-      ("ReportsScreen: Tela em foco, recarregando dados...");
-      fetchData();
+    const unsubscribeHorarios = onSnapshot(
+      doc(db, "configuracoes", "horarios"),
+      async (docSnapshot) => {
+        if (docSnapshot.exists()) {
+          const { inicio, fim } = docSnapshot.data();
+          setHorarioOperacao({ inicio, fim });
+          console.log("Horários atualizados:", { inicio, fim });
+
+          // Recalcula apenas os horários disponíveis
+          const turmas = await turmaService.getTurmas();
+          const alunos = await alunoService.getAlunos();
+          const reservas = (
+            await getDocs(query(collection(db, "reservas")))
+          ).docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+          const campos = await campoService.getCampos();
+          const prices = await priceService.getPrices();
+          const horarios = calcularHorariosDisponiveis(
+            turmas,
+            alunos,
+            reservas,
+            campos,
+            prices
+          );
+          setHorariosDisponiveis(horarios);
+        } else {
+          console.log("Nenhuma configuração encontrada, usando padrão.");
+          setHorarioOperacao({ inicio: "09:00", fim: "22:00" });
+        }
+      },
+      (error) => {
+        console.error("Erro ao escutar horários:", error);
+      }
+    );
+
+    const unsubscribeFocus = navigation.addListener("focus", () => {
+      const shouldUpdate = route.params?.shouldUpdate || false;
+      if (shouldUpdate) {
+        console.log("ReportsScreen: Mudança detectada, atualizando dados...");
+        fetchData();
+        navigation.setParams({ shouldUpdate: false });
+      }
     });
 
-    return unsubscribe;
-  }, [navigation]);
+    return () => {
+      unsubscribeHorarios();
+      unsubscribeFocus();
+    };
+  }, [navigation, route.params?.shouldUpdate]);
 
   const exportToCSV = async () => {
     try {
       const csvData = [
         "\ufeff",
-        '"Relatório de Lucro Total"',
-        '"Tipo de Serviço";"Valor (R$)"',
-        `"Turmas";"${lucroTotal.turmas.toFixed(2)}"`,
-        `"Escolinha";"${lucroTotal.escolinha.toFixed(2)}"`,
-        `"Mensalistas";"${lucroTotal.mensal.toFixed(2)}"`,
-        `"Avulsos";"${lucroTotal.avulso.toFixed(2)}"`,
+        '"Relatório Mensal"',
+        '"Quantidade de Alunos";"Quantidade de Mensalistas"',
+        `${quantidadeAlunos};${quantidadeMensalistas}`,
         "",
-        '"Lucro por Turma"',
-        '"Turma";"Valor (R$)"',
-        ...turmasLucro.map((t) => `"${t.nome}";"${t.total.toFixed(2)}"`),
+        '"Valor Mensal Total"',
+        '"Alunos (Anual)";"Mensalistas"',
+        `"${valorMensalAlunos.toFixed(2)}";"${valorMensalMensalistas.toFixed(
+          2
+        )}"`,
         "",
-        '"Lucro por Horário"',
-        '"Horário";"Valor (R$)"',
-        ...horariosLucro.map((h) => `"${h.horario}";"${h.total.toFixed(2)}"`),
-        "",
-        '"Dias Mais Cheios"',
-        '"Dia";"Quantidade de Turmas"',
-        ...diasCheios.map((d) => `"${d.dia}";"${d.count}"`),
-        "",
-        '"Turmas e Alunos em Atraso"',
+        '"Atrasados"',
         '"Nome";"Tipo";"Valor Devido (R$)"',
         ...atrasos.map(
           (a) => `"${a.nome}";"${a.tipo}";"${a.valorDevido.toFixed(2)}"`
         ),
         "",
-        '"Aluguéis Mensais"',
-        '"Nome";"Data Início";"Data Fim";"Campo";"Horário";"Ganho (R$)"',
-        ...mensalistas.map(
-          (m) =>
-            `"${m.nome}";"${m.dataInicio}";"${m.dataFim}";"${m.campo}";"${
-              m.horario
-            }";"${m.ganho.toFixed(2)}"`
-        ),
+        `"Lucro Total desde ${lucroTotal.primeiraReserva || "N/A"}"`,
+        '"Anual";"Mensal";"Avulso"',
+        `"${lucroTotal.anual.toFixed(2)}";"${lucroTotal.mensal.toFixed(
+          2
+        )}";"${lucroTotal.avulso.toFixed(2)}"`,
         "",
-        '"Aluguéis Avulsos"',
-        '"Nome";"Data";"Campo";"Horário";"Ganho (R$)"',
-        ...avulsos.map(
-          (a) =>
-            `"${a.nome}";"${a.data}";"${a.campo}";"${
-              a.horario
-            }";"${a.ganho.toFixed(2)}"`
-        ),
+        '"Média Mensal de Lucro"',
+        '"Anual";"Mensal";"Avulso"',
+        `"${mediaMensalLucro.anual.toFixed(
+          2
+        )}";"${mediaMensalLucro.mensal.toFixed(
+          2
+        )}";"${mediaMensalLucro.avulso.toFixed(2)}"`,
         "",
-        '"Aluguéis Atrasados"',
-        '"Nome";"Tipo";"Data";"Horário";"Campo";"Valor Devido (R$)"',
-        ...alugueisAtrasados.map(
-          (a) =>
-            `"${a.nome}";"${a.tipo}";"${a.data}";"${a.horario}";"${
-              a.campo
-            }";"${a.valorDevido.toFixed(2)}"`
-        ),
-        "",
-        '"Aluguéis Pagos"',
-        '"Nome";"Tipo";"Data";"Horário";"Campo";"Valor Pago (R$)";"Data Pagamento"',
-        ...alugueisPagos.map(
-          (p) =>
-            `"${p.nome}";"${p.tipo}";"${p.data}";"${p.horario}";"${
-              p.campo
-            }";"${p.valorPago.toFixed(2)}";"${p.dataPagamento}"`
+        '"Horários Disponíveis no Mês"',
+        '"Data";"Dia";"Campo";"Horas Disponíveis"',
+        ...horariosDisponiveis.map(
+          (h) => `"${h.data}";"${h.dia}";"${h.campo}";"${h.horas}"`
         ),
       ].join("\n");
 
-      const fileUri = `${FileSystem.documentDirectory}relatorios_${
+      const fileUri = `${FileSystem.documentDirectory}relatorio_mensal_${
         new Date().toISOString().split("T")[0]
       }.csv`;
       await FileSystem.writeAsStringAsync(fileUri, csvData, {
@@ -417,76 +462,36 @@ export default function ReportsScreen({ navigation }) {
       }
     } catch (error) {
       console.error("ReportsScreen: Erro ao exportar CSV:", error);
-      Alert.alert(
-        "Erro",
-        "Não foi possível exportar o relatório: " + error.message
-      );
+      Alert.alert("Erro", "Não foi possível exportar o relatório.");
     }
   };
 
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Relatórios</Text>
+        <Text style={styles.title}>Relatórios Mensais</Text>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Lucro Total</Text>
+        <Text style={styles.sectionTitle}>Quantidades</Text>
+        <Text style={styles.itemText}>Alunos (Anual): {quantidadeAlunos}</Text>
         <Text style={styles.itemText}>
-          Turmas: R$ {lucroTotal.turmas.toFixed(2)}
-        </Text>
-        <Text style={styles.itemText}>
-          Escolinha: R$ {lucroTotal.escolinha.toFixed(2)}
-        </Text>
-        <Text style={styles.itemText}>
-          Mensalistas: R$ {lucroTotal.mensal.toFixed(2)}
-        </Text>
-        <Text style={styles.itemText}>
-          Avulsos: R$ {lucroTotal.avulso.toFixed(2)}
+          Mensalistas: {quantidadeMensalistas}
         </Text>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Lucro por Turma</Text>
-        {turmasLucro.length > 0 ? (
-          turmasLucro.map((turma, index) => (
-            <Text key={index} style={styles.itemText}>
-              {turma.nome}: R$ {turma.total.toFixed(2)}
-            </Text>
-          ))
-        ) : (
-          <Text style={styles.emptyText}>Nenhuma turma registrada</Text>
-        )}
+        <Text style={styles.sectionTitle}>Valor Mensal Total</Text>
+        <Text style={styles.itemText}>
+          Alunos (Anual): R$ {valorMensalAlunos.toFixed(2)}
+        </Text>
+        <Text style={styles.itemText}>
+          Mensalistas: R$ {valorMensalMensalistas.toFixed(2)}
+        </Text>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Lucro por Horário</Text>
-        {horariosLucro.length > 0 ? (
-          horariosLucro.map((horario, index) => (
-            <Text key={index} style={styles.itemText}>
-              {horario.horario}: R$ {horario.total.toFixed(2)}
-            </Text>
-          ))
-        ) : (
-          <Text style={styles.emptyText}>Nenhum horário registrado</Text>
-        )}
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Dias Mais Cheios</Text>
-        {diasCheios.length > 0 ? (
-          diasCheios.map((dia, index) => (
-            <Text key={index} style={styles.itemText}>
-              {dia.dia}: {dia.count} turmas
-            </Text>
-          ))
-        ) : (
-          <Text style={styles.emptyText}>Nenhum dia registrado</Text>
-        )}
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Turmas e Alunos em Atraso</Text>
+        <Text style={styles.sectionTitle}>Atrasados</Text>
         {atrasos.length > 0 ? (
           atrasos.map((item, index) => (
             <Text key={index} style={styles.itemText}>
@@ -499,58 +504,45 @@ export default function ReportsScreen({ navigation }) {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Aluguéis Mensais</Text>
-        {mensalistas.length > 0 ? (
-          mensalistas.map((m, index) => (
-            <Text key={index} style={styles.itemText}>
-              {m.nome}: {m.dataInicio} a {m.dataFim}, {m.campo}, {m.horario} -
-              R$ {m.ganho.toFixed(2)}
-            </Text>
-          ))
-        ) : (
-          <Text style={styles.emptyText}>Nenhum aluguel mensal registrado</Text>
-        )}
+        <Text style={styles.sectionTitle}>
+          Lucro Total desde {lucroTotal.primeiraReserva || "N/A"}
+        </Text>
+        <Text style={styles.itemText}>
+          Anual: R$ {lucroTotal.anual.toFixed(2)}
+        </Text>
+        <Text style={styles.itemText}>
+          Mensal: R$ {lucroTotal.mensal.toFixed(2)}
+        </Text>
+        <Text style={styles.itemText}>
+          Avulso: R$ {lucroTotal.avulso.toFixed(2)}
+        </Text>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Aluguéis Avulsos</Text>
-        {avulsos.length > 0 ? (
-          avulsos.map((a, index) => (
-            <Text key={index} style={styles.itemText}>
-              {a.nome}: {a.data}, {a.campo}, {a.horario} - R${" "}
-              {a.ganho.toFixed(2)}
-            </Text>
-          ))
-        ) : (
-          <Text style={styles.emptyText}>Nenhum aluguel avulso registrado</Text>
-        )}
+        <Text style={styles.sectionTitle}>Média Mensal de Lucro</Text>
+        <Text style={styles.itemText}>
+          Anual: R$ {mediaMensalLucro.anual.toFixed(2)}
+        </Text>
+        <Text style={styles.itemText}>
+          Mensal: R$ {mediaMensalLucro.mensal.toFixed(2)}
+        </Text>
+        <Text style={styles.itemText}>
+          Avulso: R$ {mediaMensalLucro.avulso.toFixed(2)}
+        </Text>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Aluguéis Atrasados</Text>
-        {alugueisAtrasados.length > 0 ? (
-          alugueisAtrasados.map((a, index) => (
+        <Text style={styles.sectionTitle}>Horários Disponíveis no Mês</Text>
+        {horariosDisponiveis.length > 0 ? (
+          horariosDisponiveis.map((h, index) => (
             <Text key={index} style={styles.itemText}>
-              {a.nome} ({a.tipo}): {a.data}, {a.horario}, {a.campo} - R${" "}
-              {a.valorDevido.toFixed(2)}
+              {h.data} ({h.dia}) - {h.campo}: {h.horas} horas
             </Text>
           ))
         ) : (
-          <Text style={styles.emptyText}>Nenhum aluguel atrasado</Text>
-        )}
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Aluguéis Pagos</Text>
-        {alugueisPagos.length > 0 ? (
-          alugueisPagos.map((p, index) => (
-            <Text key={index} style={styles.itemText}>
-              {p.nome} ({p.tipo}): {p.data}, {p.horario}, {p.campo} - R${" "}
-              {p.valorPago.toFixed(2)} (Pago em {p.dataPagamento})
-            </Text>
-          ))
-        ) : (
-          <Text style={styles.emptyText}>Nenhum aluguel pago</Text>
+          <Text style={styles.emptyText}>
+            Nenhum horário disponível neste mês
+          </Text>
         )}
       </View>
 
