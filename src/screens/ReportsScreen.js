@@ -606,11 +606,21 @@ export default function ReportsScreen({ navigation, route }) {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Horários Disponíveis no Mês</Text>
         {horariosDisponiveis.length > 0 ? (
-          horariosDisponiveis.map((h, index) => (
-            <Text key={index} style={styles.itemText}>
-              {h.data} ({h.dia}) - {h.campo}: {h.horas} horas
-            </Text>
-          ))
+          <ScrollView
+            nestedScrollEnabled={true}
+            style={styles.scheduleContainer}
+          >
+            {horariosDisponiveis.map((h, index) => (
+              <View key={index} style={styles.scheduleItem}>
+                <Text style={styles.scheduleDate}>
+                  {moment(h.data).format("DD/MM/YYYY")} ({h.dia})
+                </Text>
+                <Text style={styles.scheduleDetails}>
+                  {h.campo}: {h.horas} horas
+                </Text>
+              </View>
+            ))}
+          </ScrollView>
         ) : (
           <Text style={styles.emptyText}>
             Nenhum horário disponível neste mês
@@ -643,6 +653,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#fff",
   },
+
   section: {
     backgroundColor: "#fff",
     padding: 15,
@@ -681,5 +692,28 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "bold",
+  },
+  scheduleContainer: {
+    maxHeight: 200, // Limita a altura para scroll interno, ajuste conforme necessário
+  },
+  scheduleItem: {
+    flexDirection: "column",
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+    backgroundColor: "#fafafa",
+    borderRadius: 5,
+    marginBottom: 5,
+  },
+  scheduleDate: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#007AFF",
+    marginBottom: 2,
+  },
+  scheduleDetails: {
+    fontSize: 14,
+    color: "#555",
   },
 });
