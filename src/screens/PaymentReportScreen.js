@@ -29,6 +29,8 @@ export default function PaymentReportScreen({ navigation, route }) {
   const [nomeResponsavel, setNomeResponsavel] = useState("");
   const [prices, setPrices] = useState({ turmas: 0, escolinha: 0, avulso: 0 });
   const [payments, setPayments] = useState([]);
+  // Novo estado para o valor da busca
+  const [searchQuery, setSearchQuery] = useState("");
 
   const fetchReservas = async () => {
     try {
@@ -82,7 +84,7 @@ export default function PaymentReportScreen({ navigation, route }) {
         .filter((reserva) => reserva.tipo === "anual")
         .map((item) => ({ ...item, type: "reserva" }));
       const reservasAvulsas = reservasData
-        .filter((reserva) => reserva.tipo === "avulso" || !reserva.tipo) // Considera avulso se tipo não for especificado
+        .filter((reserva) => reserva.tipo === "avulso" || !reserva.tipo)
         .map((item) => ({ ...item, type: "reserva" }));
 
       // Combinar nas seções corretas
@@ -225,10 +227,9 @@ export default function PaymentReportScreen({ navigation, route }) {
       };
       await paymentService.addPayment(newPayment);
 
-      // Atualizar o estado payments localmente
       setPayments((prevPayments) => [...prevPayments, newPayment]);
 
-      await fetchData(); // Ainda recarrega do backend para consistência
+      await fetchData();
       setModalVisible(false);
       setValor("");
       alert(`Pagamento registrado para ${selectedItem.nome}!`);
@@ -237,6 +238,7 @@ export default function PaymentReportScreen({ navigation, route }) {
       alert("Erro ao registrar o pagamento.");
     }
   };
+
   const handleEditItem = () => {
     if (!selectedItem) return;
     navigation.navigate(
@@ -275,6 +277,20 @@ export default function PaymentReportScreen({ navigation, route }) {
         },
       },
     ]);
+  };
+
+  // Função para filtrar os dados das seções
+  const filterSections = (sectionsData) => {
+    if (!searchQuery) return sectionsData;
+
+    return sectionsData
+      .map((section) => ({
+        ...section,
+        data: section.data.filter((item) =>
+          item.nome.toLowerCase().includes(searchQuery.toLowerCase())
+        ),
+      }))
+      .filter((section) => section.data.length > 0); // Remove seções vazias
   };
 
   const renderItem = ({ item }) => {
@@ -387,13 +403,25 @@ export default function PaymentReportScreen({ navigation, route }) {
         <Text style={styles.title}>Relatório de Pagamentos</Text>
       </View>
 
+      {/* Novo campo de busca */}
+      <TextInput
+        style={styles.searchInput}
+        placeholder="Buscar por nome..."
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+      />
+
       <SectionList
-        sections={sections}
+        sections={filterSections(sections)}
         renderItem={renderItem}
         keyExtractor={(item, index) => `${item.id}-${index}`}
         renderSectionHeader={renderSectionHeader}
         ListEmptyComponent={
-          <Text style={styles.emptyText}>Nenhum dado cadastrado</Text>
+          <Text style={styles.emptyText}>
+            {searchQuery
+              ? "Nenhum resultado encontrado"
+              : "Nenhum dado cadastrado"}
+          </Text>
         }
         ItemSeparatorComponent={() => <View style={styles.itemSeparator} />}
         SectionSeparatorComponent={() => (
@@ -512,8 +540,6 @@ export default function PaymentReportScreen({ navigation, route }) {
     </View>
   );
 }
-
-// Estilos permanecem iguais, omitidos para brevity
 
 const styles = StyleSheet.create({
   container: {
@@ -669,5 +695,17 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "bold",
+  },
+  // Novo estilo para o campo de busca
+  searchInput: {
+    width: "100%",
+    padding: 10,
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    marginBottom: 15,
+    fontSize: 16,
+    color: "#333",
+    borderWidth: 1,
+    borderColor: "#ddd",
   },
 });
