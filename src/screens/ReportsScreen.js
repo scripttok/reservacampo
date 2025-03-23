@@ -21,7 +21,8 @@ import {
   getDocs,
   doc,
   onSnapshot,
-} from "firebase/firestore";
+  getDoc,
+} from "firebase/firestore"; // Adicionei getDoc
 import moment from "moment";
 
 export default function ReportsScreen({ navigation, route }) {
@@ -42,10 +43,7 @@ export default function ReportsScreen({ navigation, route }) {
     avulso: 0,
   });
   const [horariosDisponiveis, setHorariosDisponiveis] = useState([]);
-  const [horarioOperacao, setHorarioOperacao] = useState({
-    inicio: "09:00",
-    fim: "22:00",
-  });
+  const [horarioOperacao, setHorarioOperacao] = useState(null); // Estado inicial como null
 
   const fetchData = async () => {
     try {
@@ -138,6 +136,13 @@ export default function ReportsScreen({ navigation, route }) {
     console.log("ReportsScreen: Calculando horários disponíveis com:", {
       horarioOperacao,
     });
+    if (!horarioOperacao) {
+      console.log(
+        "ReportsScreen: Horário de operação não carregado ainda, abortando cálculo."
+      );
+      return [];
+    }
+
     const today = moment("2025-03-23");
     const startOfMonth = today.clone().startOf("month");
     const endOfMonth = today.clone().endOf("month");
@@ -356,10 +361,32 @@ export default function ReportsScreen({ navigation, route }) {
     return atrasados.sort((a, b) => a.nome.localeCompare(b.nome));
   };
 
-  // useEffect para carregar dados iniciais e configurar o listener do Firestore
+  // Carrega os dados iniciais e configura o listener do Firestore
   useEffect(() => {
     console.log("ReportsScreen: useEffect inicial iniciado");
-    fetchData();
+
+    const loadInitialData = async () => {
+      // Carrega o horário do Firestore imediatamente
+      const horarioDocRef = doc(db, "configuracoes", "horarios");
+      const horarioDoc = await getDoc(horarioDocRef);
+      if (horarioDoc.exists()) {
+        const { inicio, fim } = horarioDoc.data();
+        console.log(
+          "ReportsScreen: Horários carregados inicialmente do Firestore:",
+          { inicio, fim }
+        );
+        setHorarioOperacao({ inicio, fim });
+      } else {
+        console.log(
+          "ReportsScreen: Nenhum horário encontrado, usando padrão inicial."
+        );
+        setHorarioOperacao({ inicio: "09:00", fim: "22:00" }); // Padrão só se não houver nada no Firestore
+      }
+
+      await fetchData();
+    };
+
+    loadInitialData();
 
     const unsubscribeHorarios = onSnapshot(
       doc(db, "configuracoes", "horarios"),
@@ -402,8 +429,10 @@ export default function ReportsScreen({ navigation, route }) {
     };
   }, [navigation, route.params?.shouldUpdate]);
 
-  // useEffect separado para recalcular horários disponíveis quando horarioOperacao mudar
+  // Recalcula os horários disponíveis quando horarioOperacao mudar
   useEffect(() => {
+    if (!horarioOperacao) return; // Não recalcula até que o horário esteja carregado
+
     console.log("ReportsScreen: useEffect de recálculo disparado com:", {
       horarioOperacao,
     });
@@ -500,6 +529,14 @@ export default function ReportsScreen({ navigation, route }) {
       Alert.alert("Erro", "Não foi possível exportar o relatório.");
     }
   };
+
+  if (!horarioOperacao) {
+    return (
+      <View style={styles.container}>
+        <Text>Carregando horários...</Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container}>

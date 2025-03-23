@@ -15,10 +15,16 @@ import { campoService } from "../services/campoService";
 import { turmaService } from "../services/turmaService";
 import { escolinhaService } from "../services/escolinhaService";
 import { alunoService } from "../services/alunoService";
-import { configService } from "../services/configService";
 import { paymentService } from "../services/paymentService";
 import { db } from "../services/firebaseService";
-import { collection, query, getDocs, doc, setDoc } from "firebase/firestore";
+import {
+  collection,
+  query,
+  getDocs,
+  doc,
+  setDoc,
+  getDoc,
+} from "firebase/firestore"; // Adicionei getDoc
 import moment from "moment";
 import Campo from "../components/Campo";
 import { DrawerActions } from "@react-navigation/native";
@@ -33,8 +39,8 @@ export default function HomeScreen({ navigation, route }) {
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [configModalVisible, setConfigModalVisible] = useState(false);
   const [novoCampoNome, setNovoCampoNome] = useState("");
-  const [horarioInicio, setHorarioInicio] = useState("09:00");
-  const [horarioFim, setHorarioFim] = useState("23:00");
+  const [horarioInicio, setHorarioInicio] = useState(null); // Estado inicial como null
+  const [horarioFim, setHorarioFim] = useState(null); // Estado inicial como null
   const [atrasoItem, setAtrasoItem] = useState(null);
   const [blinkAnim] = useState(new Animated.Value(1));
 
@@ -43,9 +49,27 @@ export default function HomeScreen({ navigation, route }) {
       try {
         console.log("HomeScreen: Buscando dados, modo atual:", mode);
         const camposData = await campoService.getCampos();
-        const horario = await configService.getHorarioFuncionamento();
         const paymentsData = await paymentService.getPayments();
         console.log("HomeScreen: Payments Data:", paymentsData);
+
+        const horarioDocRef = doc(db, "configuracoes", "horarios");
+        const horarioDoc = await getDoc(horarioDocRef);
+        let horario;
+        if (horarioDoc.exists()) {
+          horario = horarioDoc.data();
+          console.log(
+            "HomeScreen: Horários carregados inicialmente do Firestore:",
+            horario
+          );
+        } else {
+          console.log(
+            "HomeScreen: Nenhum horário encontrado, usando padrão inicial."
+          );
+          horario = { inicio: "09:00", fim: "22:00" };
+        }
+        setHorarioInicio(horario.inicio);
+        setHorarioFim(horario.fim);
+
         let turmasOuAulasData = [];
         if (mode === "turmas") {
           turmasOuAulasData = await turmaService.getTurmas();
@@ -62,12 +86,6 @@ export default function HomeScreen({ navigation, route }) {
         }
         setCampos(camposData);
         setTurmasOuAulas(turmasOuAulasData);
-        setHorarioInicio(horario.inicio);
-        setHorarioFim(horario.fim);
-        console.log("HomeScreen: Horários carregados inicialmente:", {
-          inicio: horario.inicio,
-          fim: horario.fim,
-        });
 
         const atraso = await checkPaymentStatus(
           turmasOuAulasData,
@@ -86,6 +104,22 @@ export default function HomeScreen({ navigation, route }) {
     };
     fetchData();
 
+    // Verifica parâmetros para abrir modals
+    if (route.params?.openConfig) {
+      console.log(
+        "HomeScreen: Parâmetro openConfig detectado, abrindo modal de configuração"
+      );
+      setConfigModalVisible(true);
+      navigation.setParams({ openConfig: false });
+    }
+    if (route.params?.openAddModal) {
+      console.log(
+        "HomeScreen: Parâmetro openAddModal detectado, abrindo modal de adicionar campo"
+      );
+      setAddModalVisible(true);
+      navigation.setParams({ openAddModal: false });
+    }
+
     Animated.loop(
       Animated.sequence([
         Animated.timing(blinkAnim, {
@@ -101,7 +135,6 @@ export default function HomeScreen({ navigation, route }) {
       ])
     ).start();
 
-    // Configurar opções de navegação
     navigation.setOptions({
       headerRight: () => (
         <View style={{ flexDirection: "row" }}>
@@ -126,9 +159,25 @@ export default function HomeScreen({ navigation, route }) {
       ),
     });
 
-    const unsubscribe = navigation.addListener("focus", fetchData);
+    const unsubscribe = navigation.addListener("focus", () => {
+      fetchData();
+      if (route.params?.openConfig) {
+        console.log(
+          "HomeScreen: Foco com openConfig, abrindo modal de configuração"
+        );
+        setConfigModalVisible(true);
+        navigation.setParams({ openConfig: false });
+      }
+      if (route.params?.openAddModal) {
+        console.log(
+          "HomeScreen: Foco com openAddModal, abrindo modal de adicionar campo"
+        );
+        setAddModalVisible(true);
+        navigation.setParams({ openAddModal: false });
+      }
+    });
     return unsubscribe;
-  }, [navigation, mode]);
+  }, [navigation, mode, route.params?.openConfig, route.params?.openAddModal]); // Adicionei openAddModal como dependência
 
   const fetchReservasMensais = async () => {
     try {
@@ -376,7 +425,7 @@ export default function HomeScreen({ navigation, route }) {
     }
   };
 
-  if (loading) {
+  if (loading || !horarioInicio || !horarioFim) {
     return (
       <View style={styles.container}>
         <Text>Carregando...</Text>

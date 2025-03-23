@@ -3,16 +3,16 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createDrawerNavigator } from "@react-navigation/drawer";
 import { createStackNavigator } from "@react-navigation/stack";
 import { DrawerContentScrollView, DrawerItem } from "@react-navigation/drawer";
-import { View, Text } from "react-native"; // Import necessário para PlaceholderScreen
+import { View, Text } from "react-native";
 import HomeScreen from "./src/screens/HomeScreen";
 import CampoDetailScreen from "./src/screens/CampoDetailScreen";
 import AddCampoScreen from "./src/screens/AddCampoScreen";
 import AddTurmaScreen from "./src/screens/AddTurmaScreen";
 import AlunosScreen from "./src/screens/AlunosScreen";
 import PriceTableScreen from "./src/screens/PriceTableScreen";
-import PaymentReportScreen from "./src/screens/PaymentReportScreen"; // Nova tela
+import PaymentReportScreen from "./src/screens/PaymentReportScreen";
 import ReportsScreen from "./src/screens/ReportsScreen";
-import CalendarioScreen from "./src/screens/CalendarioScreen"; // Importe a nova tela
+import CalendarioScreen from "./src/screens/CalendarioScreen";
 
 const Drawer = createDrawerNavigator();
 const Stack = createStackNavigator();
@@ -47,41 +47,21 @@ function CustomDrawerContent(props) {
   const { navigation, setMode, mode } = props;
 
   const handleAddCampo = () => {
-    ("Drawer: Solicitando abertura do modal de adicionar campo");
-    const homeParams = navigation
-      .getState()
-      .routes.find((r) => r.name === "HomeStack")?.state?.routes[0]?.params;
-    if (homeParams?.openAddModal) {
-      homeParams.openAddModal();
-      navigation.closeDrawer();
-    } else {
-      ("Drawer: Navegando para Home com modal de adicionar campo");
-      navigation.navigate("HomeStack", {
-        screen: "Home",
-        params: { openAddModal: true, mode },
-      });
-      navigation.closeDrawer();
-    }
+    console.log("Drawer: Navegando para Home com modal de adicionar campo");
+    navigation.navigate("HomeStack", {
+      screen: "Home",
+      params: { openAddModal: true, mode },
+    });
+    navigation.closeDrawer();
   };
 
   const handleConfigHorarios = () => {
-    ("Drawer: Solicitando abertura do modal de configurar horários");
-    const homeParams = navigation
-      .getState()
-      .routes.find((r) => r.name === "HomeStack")?.state?.routes[0]?.params;
-    if (homeParams?.openConfigModal) {
-      homeParams.openConfigModal();
-      navigation.closeDrawer();
-    } else {
-      console.error(
-        "Drawer: openConfigModal não encontrado nos parâmetros da Home!"
-      );
-      navigation.navigate("HomeStack", {
-        screen: "Home",
-        params: { openConfigModal: true },
-      });
-      navigation.closeDrawer();
-    }
+    console.log("Drawer: Navegando para Home com modal de configurar horários");
+    navigation.navigate("HomeStack", {
+      screen: "Home",
+      params: { openConfig: true, mode }, // Usando openConfig em vez de openConfigModal
+    });
+    navigation.closeDrawer();
   };
 
   return (
@@ -143,7 +123,6 @@ function CustomDrawerContent(props) {
         }}
         labelStyle={{ color: "#fff", fontSize: 18 }}
       />
-      {/* Novo item para o Calendário */}
       <DrawerItem
         label="Calendário"
         onPress={() => {
@@ -180,7 +159,6 @@ export default function App() {
         <Drawer.Screen name="Relatorios" component={ReportsScreen} />
         <Drawer.Screen name="Alunos" component={AlunosScreen} />
         <Drawer.Screen name="PriceTable" component={PriceTableScreen} />
-        {/* Nova rota para o Calendário */}
         <Drawer.Screen name="Calendario" component={CalendarioScreen} />
       </Drawer.Navigator>
     </NavigationContainer>
