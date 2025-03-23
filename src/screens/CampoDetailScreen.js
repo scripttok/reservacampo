@@ -60,9 +60,9 @@ export default function CampoDetailScreen({ route, navigation }) {
       );
       const aulasFiltradas = updatedAulas.filter((a) => a.campoId === campo.id);
 
-      console.log("CampoDetailScreen: Turmas filtradas:", turmasFiltradas);
-      console.log("CampoDetailScreen: Aulas filtradas:", aulasFiltradas);
-      console.log("CampoDetailScreen: Reservas carregadas:", reservas);
+      "CampoDetailScreen: Turmas filtradas:", turmasFiltradas;
+      "CampoDetailScreen: Aulas filtradas:", aulasFiltradas;
+      "CampoDetailScreen: Reservas carregadas:", reservas;
 
       setTurmasDoCampo(turmasFiltradas);
       setAulasDoCampo(aulasFiltradas);
@@ -84,7 +84,7 @@ export default function CampoDetailScreen({ route, navigation }) {
       querySnapshot.forEach((doc) => {
         reservas.push({ id: doc.id, ...doc.data() });
       });
-      console.log("CampoDetailScreen: Reservas do Firestore:", reservas);
+      "CampoDetailScreen: Reservas do Firestore:", reservas;
       return reservas;
     } catch (error) {
       console.error("Erro ao buscar reservas do Firestore:", error);
@@ -129,7 +129,7 @@ export default function CampoDetailScreen({ route, navigation }) {
       a.horarioInicio?.localeCompare(b.horarioInicio)
   );
 
-  console.log("CampoDetailScreen: Itens do dia para renderizar:", itensDoDia);
+  "CampoDetailScreen: Itens do dia para renderizar:", itensDoDia;
 
   const calcularHorariosDisponiveis = (inicio, fim, itensOcupados) => {
     const horarios = [];
@@ -352,6 +352,26 @@ export default function CampoDetailScreen({ route, navigation }) {
           {campo.nome} ({mode === "turmas" ? "Turmas" : "Escolinha"})
         </Text>
       </View>
+      <FlatList
+        data={diasDaSemana}
+        renderItem={renderDiaButton}
+        keyExtractor={(item) => item}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.diasContainer}
+      />
+
+      <FlatList
+        data={horariosDisponiveis}
+        renderItem={renderHorarioButton}
+        keyExtractor={(item) => `${item.inicio}-${item.fim}`}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.horariosContainer}
+        ListEmptyComponent={
+          <Text style={styles.noHorarioText}>Nenhum horário disponível</Text>
+        }
+      />
       <View style={styles.turmasContainer}>
         {itensDoDia.length > 0 ? (
           itensDoDia.map((item) => {
@@ -409,6 +429,7 @@ export default function CampoDetailScreen({ route, navigation }) {
                     Data: {moment(item.data).format("DD/MM/YYYY")}
                   </Text>
                 )}
+
                 <View style={styles.actions}>
                   <TouchableOpacity
                     style={styles.editButton}
@@ -430,27 +451,6 @@ export default function CampoDetailScreen({ route, navigation }) {
           <Text style={styles.noTurmaText}>Nenhum item neste dia</Text>
         )}
       </View>
-
-      <FlatList
-        data={diasDaSemana}
-        renderItem={renderDiaButton}
-        keyExtractor={(item) => item}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.diasContainer}
-      />
-
-      <FlatList
-        data={horariosDisponiveis}
-        renderItem={renderHorarioButton}
-        keyExtractor={(item) => `${item.inicio}-${item.fim}`}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.horariosContainer}
-        ListEmptyComponent={
-          <Text style={styles.noHorarioText}>Nenhum horário disponível</Text>
-        }
-      />
     </ScrollView>
   );
 }

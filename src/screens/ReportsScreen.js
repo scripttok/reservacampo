@@ -36,7 +36,7 @@ export default function ReportsScreen({ navigation }) {
 
   const fetchData = async () => {
     try {
-      console.log("ReportsScreen: Iniciando busca de dados");
+      ("ReportsScreen: Iniciando busca de dados");
       const payments = await paymentService.getPayments();
       const turmas = await turmaService.getTurmas();
       const alunos = await alunoService.getAlunos();
@@ -48,19 +48,16 @@ export default function ReportsScreen({ navigation }) {
         ...doc.data(),
       }));
 
-      console.log("ReportsScreen: Reservas encontradas:", reservas.length);
+      "ReportsScreen: Reservas encontradas:", reservas.length;
 
       // Separar reservas por tipo
       const mensalistasData = reservas.filter((r) => r.tipo === "mensal");
       const avulsosData = reservas.filter((r) => r.tipo === "avulso");
       const anuaisData = reservas.filter((r) => r.tipo === "anual");
 
-      console.log(
-        "ReportsScreen: Mensalistas encontrados:",
-        mensalistasData.length
-      );
-      console.log("ReportsScreen: Avulsos encontrados:", avulsosData.length);
-      console.log("ReportsScreen: Anuais encontrados:", anuaisData.length);
+      "ReportsScreen: Mensalistas encontrados:", mensalistasData.length;
+      "ReportsScreen: Avulsos encontrados:", avulsosData.length;
+      "ReportsScreen: Anuais encontrados:", anuaisData.length;
 
       // Calcular lucro total
       const lucroPayments = payments.reduce(
@@ -330,7 +327,7 @@ export default function ReportsScreen({ navigation }) {
     fetchData();
 
     const unsubscribe = navigation.addListener("focus", () => {
-      console.log("ReportsScreen: Tela em foco, recarregando dados...");
+      ("ReportsScreen: Tela em foco, recarregando dados...");
       fetchData();
     });
 

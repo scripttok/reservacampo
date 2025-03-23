@@ -41,11 +41,11 @@ export default function HomeScreen({ navigation, route }) {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        console.log("HomeScreen: Buscando dados, modo atual:", mode);
+        "HomeScreen: Buscando dados, modo atual:", mode;
         const camposData = await campoService.getCampos();
         const horario = await configService.getHorarioFuncionamento();
         const paymentsData = await paymentService.getPayments();
-        console.log("HomeScreen: Payments Data:", paymentsData);
+        "HomeScreen: Payments Data:", paymentsData;
         let turmasOuAulasData = [];
         if (mode === "turmas") {
           turmasOuAulasData = await turmaService.getTurmas();
@@ -70,7 +70,7 @@ export default function HomeScreen({ navigation, route }) {
           paymentsData,
           mode
         );
-        console.log("HomeScreen: Item em atraso encontrado:", atraso);
+        "HomeScreen: Item em atraso encontrado:", atraso;
         setAtrasoItem(atraso);
 
         // Verificar aluguéis mensais próximos do vencimento
@@ -100,11 +100,11 @@ export default function HomeScreen({ navigation, route }) {
 
     navigation.setParams({
       openAddModal: () => {
-        console.log("HomeScreen: Abrindo modal de adicionar campo");
+        ("HomeScreen: Abrindo modal de adicionar campo");
         setAddModalVisible(true);
       },
       openConfigModal: () => {
-        console.log("HomeScreen: Abrindo modal de configurar horários");
+        ("HomeScreen: Abrindo modal de configurar horários");
         setConfigModalVisible(true);
       },
     });
@@ -115,7 +115,7 @@ export default function HomeScreen({ navigation, route }) {
 
   const fetchReservasMensais = async () => {
     try {
-      console.log("HomeScreen: Buscando reservas mensais");
+      ("HomeScreen: Buscando reservas mensais");
       const reservasRef = collection(db, "reservas");
       const q = query(reservasRef);
       const querySnapshot = await getDocs(q);
@@ -126,7 +126,7 @@ export default function HomeScreen({ navigation, route }) {
       const mensais = reservasData.filter(
         (reserva) => reserva.tipo === "mensal"
       );
-      console.log("HomeScreen: Reservas mensais encontradas:", mensais);
+      "HomeScreen: Reservas mensais encontradas:", mensais;
       return mensais;
     } catch (error) {
       console.error("Erro ao buscar reservas mensais do Firestore:", error);
@@ -135,11 +135,11 @@ export default function HomeScreen({ navigation, route }) {
   };
 
   const checkMonthlyRentalsExpiration = async () => {
-    console.log("HomeScreen: Verificando vencimento de aluguéis mensais");
+    ("HomeScreen: Verificando vencimento de aluguéis mensais");
     const reservasMensais = await fetchReservasMensais();
     const today = moment(); // Data atual do sistema
     const todayStr = today.format("YYYY-MM-DD");
-    console.log("HomeScreen: Data atual:", todayStr);
+    "HomeScreen: Data atual:", todayStr;
 
     for (const reserva of reservasMensais) {
       const dataInicial = moment(reserva.data);
@@ -149,13 +149,11 @@ export default function HomeScreen({ navigation, route }) {
         .startOf("week")
         .add(1, "day"); // Segunda-feira
 
-      console.log(
-        `HomeScreen: Reserva "${reserva.nome}", início: ${dataInicial.format(
-          "DD/MM/YYYY"
-        )}, vencimento: ${dataVencimento.format(
-          "DD/MM/YYYY"
-        )}, início última semana: ${startOfLastWeek.format("DD/MM/YYYY")}`
-      );
+      `HomeScreen: Reserva "${reserva.nome}", início: ${dataInicial.format(
+        "DD/MM/YYYY"
+      )}, vencimento: ${dataVencimento.format(
+        "DD/MM/YYYY"
+      )}, início última semana: ${startOfLastWeek.format("DD/MM/YYYY")}`;
 
       if (
         today.isBetween(startOfLastWeek, dataVencimento, null, "[]") &&
@@ -165,11 +163,9 @@ export default function HomeScreen({ navigation, route }) {
         const lastAlertDate = await AsyncStorage.getItem(lastAlertKey);
         const lastAlertMoment = lastAlertDate ? moment(lastAlertDate) : null;
 
-        console.log(
-          `HomeScreen: Reserva "${
-            reserva.nome
-          }" na última semana. Último alerta: ${lastAlertDate || "nenhum"}`
-        );
+        `HomeScreen: Reserva "${
+          reserva.nome
+        }" na última semana. Último alerta: ${lastAlertDate || "nenhum"}`;
 
         if (!lastAlertMoment || !lastAlertMoment.isSame(today, "day")) {
           Alert.alert(
@@ -179,21 +175,15 @@ export default function HomeScreen({ navigation, route }) {
             }" vence em ${dataVencimento.format(
               "DD/MM/YYYY"
             )} (${dataVencimento.fromNow()}).`,
-            [{ text: "OK", onPress: () => console.log("Alerta confirmado") }]
+            [{ text: "OK", onPress: () => "Alerta confirmado" }]
           );
           await AsyncStorage.setItem(lastAlertKey, todayStr);
-          console.log(
-            `HomeScreen: Alerta exibido para "${reserva.nome}", salvo em ${lastAlertKey}`
-          );
+          `HomeScreen: Alerta exibido para "${reserva.nome}", salvo em ${lastAlertKey}`;
         } else {
-          console.log(
-            `HomeScreen: Alerta para "${reserva.nome}" já exibido hoje`
-          );
+          `HomeScreen: Alerta para "${reserva.nome}" já exibido hoje`;
         }
       } else {
-        console.log(
-          `HomeScreen: Reserva "${reserva.nome}" fora da última semana`
-        );
+        `HomeScreen: Reserva "${reserva.nome}" fora da última semana`;
       }
     }
   };
@@ -278,16 +268,14 @@ export default function HomeScreen({ navigation, route }) {
 
   const handleAtrasoPress = () => {
     if (atrasoItem) {
-      console.log(
-        "HomeScreen: Navegando para PaymentReport com item em atraso:",
-        atrasoItem
-      );
+      "HomeScreen: Navegando para PaymentReport com item em atraso:",
+        atrasoItem;
       navigation.navigate("PaymentReport", { atrasoItemId: atrasoItem.id });
     }
   };
 
   const handleCampoPress = (campo) => {
-    console.log("HomeScreen: Clicou no campo:", campo, "Modo:", mode);
+    "HomeScreen: Clicou no campo:", campo, "Modo:", mode;
     if (!campo) {
       console.error("HomeScreen: Campo é undefined!");
       return;
@@ -296,7 +284,7 @@ export default function HomeScreen({ navigation, route }) {
   };
 
   const handleLongPressCampo = (campo) => {
-    console.log("HomeScreen: Long press no campo:", campo);
+    "HomeScreen: Long press no campo:", campo;
     setCampoParaExcluir(campo);
     setModalVisible(true);
   };

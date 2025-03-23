@@ -39,7 +39,7 @@ export default function PaymentReportScreen({ navigation, route }) {
         ...doc.data(),
         type: "reserva",
       }));
-      console.log("PaymentReportScreen: Reservas recebidas:", reservasList);
+      "PaymentReportScreen: Reservas recebidas:", reservasList;
       return reservasList;
     } catch (error) {
       console.error("PaymentReportScreen: Erro ao buscar reservas:", error);
@@ -50,14 +50,14 @@ export default function PaymentReportScreen({ navigation, route }) {
   const fetchData = async () => {
     try {
       const turmasData = await turmaService.getTurmas();
-      console.log("Turmas recebidas:", turmasData);
+      "Turmas recebidas:", turmasData;
       const alunosData = await alunoService.getAlunos();
-      console.log("Alunos recebidos:", alunosData);
+      "Alunos recebidos:", alunosData;
       const reservasData = await fetchReservas();
       const pricesData = await priceService.getPrices();
-      console.log("Preços recebidos:", pricesData);
+      "Preços recebidos:", pricesData;
       const paymentsData = await paymentService.getPayments();
-      console.log("Pagamentos recebidos:", paymentsData);
+      "Pagamentos recebidos:", paymentsData;
 
       setPrices(pricesData);
       setPayments(paymentsData);
