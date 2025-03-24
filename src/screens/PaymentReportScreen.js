@@ -439,7 +439,7 @@ export default function PaymentReportScreen({ navigation, route }) {
             </Text>
 
             <Text style={styles.label}>Registrar Pagamento</Text>
-            <Text style={styles.label}>Tipo de Serviço</Text>
+
             <View style={styles.serviceButtons}>
               <TouchableOpacity
                 style={[
@@ -463,7 +463,7 @@ export default function PaymentReportScreen({ navigation, route }) {
                   setValor(prices.escolinha.toString());
                 }}
               >
-                <Text style={styles.serviceButtonText}>Escolinha</Text>
+                <Text style={styles.serviceButtonText}>Escola</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[
@@ -509,7 +509,7 @@ export default function PaymentReportScreen({ navigation, route }) {
                 style={styles.actionButton}
                 onPress={handleRegisterPayment}
               >
-                <Text style={styles.buttonText}>Registrar Pagamento</Text>
+                <Text style={styles.buttonText}>Pagar</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.actionButton}

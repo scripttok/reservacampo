@@ -22,7 +22,7 @@ import {
   doc,
   onSnapshot,
   getDoc,
-} from "firebase/firestore"; // Adicionei getDoc
+} from "firebase/firestore";
 import moment from "moment";
 
 export default function ReportsScreen({ navigation, route }) {
@@ -43,11 +43,11 @@ export default function ReportsScreen({ navigation, route }) {
     avulso: 0,
   });
   const [horariosDisponiveis, setHorariosDisponiveis] = useState([]);
-  const [horarioOperacao, setHorarioOperacao] = useState(null); // Estado inicial como null
+  const [horarioOperacao, setHorarioOperacao] = useState(null);
 
   const fetchData = async () => {
     try {
-      ("ReportsScreen: Iniciando fetchData");
+      console.log("ReportsScreen: Iniciando fetchData");
       const payments = await paymentService.getPayments();
       const turmas = await turmaService.getTurmas();
       const alunos = await alunoService.getAlunos();
@@ -59,21 +59,23 @@ export default function ReportsScreen({ navigation, route }) {
         ...doc.data(),
       }));
 
-      // Contar apenas alunos cadastrados
       setQuantidadeAlunos(alunos.length);
-      "ReportsScreen: Quantidade de Alunos:", alunos.length;
+      console.log("ReportsScreen: Quantidade de Alunos:", alunos.length);
 
-      // Contar turmas e reservas mensais
       const reservasMensais = reservas.filter(
         (reserva) => reserva.tipo === "mensal"
       );
       setQuantidadeMensalistas(turmas.length + reservasMensais.length);
-      "ReportsScreen: Quantidade de Mensalistas:",
-        turmas.length + reservasMensais.length;
+      console.log(
+        "ReportsScreen: Quantidade de Mensalistas:",
+        turmas.length + reservasMensais.length
+      );
 
-      // Valor mensal apenas para alunos cadastrados
       setValorMensalAlunos(alunos.length * prices.escolinha);
-      "ReportsScreen: Valor Mensal Alunos:", alunos.length * prices.escolinha;
+      console.log(
+        "ReportsScreen: Valor Mensal Alunos:",
+        alunos.length * prices.escolinha
+      );
 
       setValorMensalMensalistas(
         (turmas.length + reservasMensais.length) * prices.turmas
@@ -87,23 +89,21 @@ export default function ReportsScreen({ navigation, route }) {
       const atrasosData = calcularAtrasos(todosItens, payments, prices);
       setAtrasos(atrasosData);
 
-      // Filtrar IDs dos alunos cadastrados
       const alunoIds = alunos.map((aluno) => aluno.id);
-      "ReportsScreen: IDs dos Alunos:", alunoIds;
+      console.log("ReportsScreen: IDs dos Alunos:", alunoIds);
 
-      // Log dos pagamentos antes do filtro
-      "ReportsScreen: Todos os Pagamentos:", payments;
+      console.log("ReportsScreen: Todos os Pagamentos:", payments);
 
-      // Lucro total apenas para alunos (exclui reservas anuais)
       const lucroAnual = payments
         .filter((p) => {
           const isAlunoPayment =
             p.tipoServico === "Escolinha" && alunoIds.includes(p.itemId);
-          // Verifica se o itemId não pertence a uma reserva anual
           const isNotReservaAnual = !reservas.some(
             (r) => r.id === p.itemId && r.tipo === "anual"
           );
-          `ReportsScreen: Verificando pagamento - tipo: ${p.tipoServico}, itemId: ${p.itemId}, é aluno? ${isAlunoPayment}, não é reserva anual? ${isNotReservaAnual}`;
+          console.log(
+            `ReportsScreen: Verificando pagamento - tipo: ${p.tipoServico}, itemId: ${p.itemId}, é aluno? ${isAlunoPayment}, não é reserva anual? ${isNotReservaAnual}`
+          );
           return isAlunoPayment && isNotReservaAnual;
         })
         .reduce((sum, p) => sum + Math.max(p.valor, 0), 0);
@@ -129,7 +129,6 @@ export default function ReportsScreen({ navigation, route }) {
         primeiraReserva: primeiraReserva,
       });
 
-      // Ajuste na média mensal de lucro apenas para alunos
       if (primeiraReserva) {
         const dataPrimeiraReserva = moment(reservasOrdenadas[0].data);
         const dataAtual = moment("2025-03-23");
@@ -139,15 +138,15 @@ export default function ReportsScreen({ navigation, route }) {
           mesesDiferenca++;
           currentDate.add(1, "month");
         }
-        mesesDiferenca = Math.max(mesesDiferenca, 1); // Garante que seja pelo menos 1
+        mesesDiferenca = Math.max(mesesDiferenca, 1);
 
-        "ReportsScreen: Meses de Diferença:", mesesDiferenca;
+        console.log("ReportsScreen: Meses de Diferença:", mesesDiferenca);
 
         const mediaAnual =
           alunos.length > 0
             ? (alunos.length * prices.escolinha) / mesesDiferenca
             : 0;
-        "ReportsScreen: Média Anual Calculada:", mediaAnual;
+        console.log("ReportsScreen: Média Anual Calculada:", mediaAnual);
 
         const mediaMensal =
           reservasMensais.length > 0
@@ -170,7 +169,7 @@ export default function ReportsScreen({ navigation, route }) {
         setMediaMensalLucro({ anual: 0, mensal: 0, avulso: 0 });
       }
 
-      ("ReportsScreen: fetchData concluído");
+      console.log("ReportsScreen: fetchData concluído");
     } catch (error) {
       console.error("ReportsScreen: Erro ao carregar dados:", error);
       Alert.alert(
@@ -187,12 +186,13 @@ export default function ReportsScreen({ navigation, route }) {
     campos,
     prices
   ) => {
-    "ReportsScreen: Calculando horários disponíveis com:",
-      {
-        horarioOperacao,
-      };
+    console.log("ReportsScreen: Calculando horários disponíveis com:", {
+      horarioOperacao,
+    });
     if (!horarioOperacao) {
-      ("ReportsScreen: Horário de operação não carregado ainda, abortando cálculo.");
+      console.log(
+        "ReportsScreen: Horário de operação não carregado ainda, abortando cálculo."
+      );
       return [];
     }
 
@@ -293,7 +293,10 @@ export default function ReportsScreen({ navigation, route }) {
       "hours",
       true
     );
-    "ReportsScreen: Horas totais por dia calculadas:", horasTotaisDia;
+    console.log(
+      "ReportsScreen: Horas totais por dia calculadas:",
+      horasTotaisDia
+    );
 
     const horariosDisponiveisData = [];
     let currentDate = startOfMonth.clone();
@@ -321,7 +324,10 @@ export default function ReportsScreen({ navigation, route }) {
       currentDate.add(1, "day");
     }
 
-    "ReportsScreen: Horários disponíveis calculados:", horariosDisponiveisData;
+    console.log(
+      "ReportsScreen: Horários disponíveis calculados:",
+      horariosDisponiveisData
+    );
     return horariosDisponiveisData.sort((a, b) => a.data.localeCompare(b.data));
   };
 
@@ -408,22 +414,24 @@ export default function ReportsScreen({ navigation, route }) {
     return atrasados.sort((a, b) => a.nome.localeCompare(b.nome));
   };
 
-  // Carrega os dados iniciais e configura o listener do Firestore
   useEffect(() => {
-    ("ReportsScreen: useEffect inicial iniciado");
+    console.log("ReportsScreen: useEffect inicial iniciado");
 
     const loadInitialData = async () => {
-      // Carrega o horário do Firestore imediatamente
       const horarioDocRef = doc(db, "configuracoes", "horarios");
       const horarioDoc = await getDoc(horarioDocRef);
       if (horarioDoc.exists()) {
         const { inicio, fim } = horarioDoc.data();
-        "ReportsScreen: Horários carregados inicialmente do Firestore:",
-          { inicio, fim };
+        console.log(
+          "ReportsScreen: Horários carregados inicialmente do Firestore:",
+          { inicio, fim }
+        );
         setHorarioOperacao({ inicio, fim });
       } else {
-        ("ReportsScreen: Nenhum horário encontrado, usando padrão inicial.");
-        setHorarioOperacao({ inicio: "09:00", fim: "22:00" }); // Padrão só se não houver nada no Firestore
+        console.log(
+          "ReportsScreen: Nenhum horário encontrado, usando padrão inicial."
+        );
+        setHorarioOperacao({ inicio: "09:00", fim: "22:00" });
       }
 
       await fetchData();
@@ -431,20 +439,22 @@ export default function ReportsScreen({ navigation, route }) {
 
     loadInitialData();
 
+    // Listeners em tempo real
     const unsubscribeHorarios = onSnapshot(
       doc(db, "configuracoes", "horarios"),
       (docSnapshot) => {
-        ("ReportsScreen: onSnapshot disparado");
+        console.log("ReportsScreen: onSnapshot disparado para horários");
         if (docSnapshot.exists()) {
           const { inicio, fim } = docSnapshot.data();
-          "ReportsScreen: Dados recebidos do Firestore:",
-            {
-              inicio,
-              fim,
-            };
+          console.log("ReportsScreen: Dados recebidos do Firestore:", {
+            inicio,
+            fim,
+          });
           setHorarioOperacao({ inicio, fim });
         } else {
-          ("ReportsScreen: Nenhuma configuração encontrada, usando padrão.");
+          console.log(
+            "ReportsScreen: Nenhuma configuração encontrada, usando padrão."
+          );
           setHorarioOperacao({ inicio: "09:00", fim: "22:00" });
         }
       },
@@ -453,33 +463,105 @@ export default function ReportsScreen({ navigation, route }) {
       }
     );
 
+    const unsubscribeReservas = onSnapshot(
+      collection(db, "reservas"),
+      (snapshot) => {
+        console.log("ReportsScreen: Mudança detectada em reservas");
+        fetchData();
+      },
+      (error) => {
+        console.error("ReportsScreen: Erro ao escutar reservas:", error);
+      }
+    );
+
+    const unsubscribePayments = onSnapshot(
+      collection(db, "payments"),
+      (snapshot) => {
+        console.log("ReportsScreen: Mudança detectada em payments");
+        fetchData();
+      },
+      (error) => {
+        console.error("ReportsScreen: Erro ao escutar payments:", error);
+      }
+    );
+
+    const unsubscribeTurmas = onSnapshot(
+      collection(db, "turmas"),
+      (snapshot) => {
+        console.log("ReportsScreen: Mudança detectada em turmas");
+        fetchData();
+      },
+      (error) => {
+        console.error("ReportsScreen: Erro ao escutar turmas:", error);
+      }
+    );
+
+    const unsubscribeAlunos = onSnapshot(
+      collection(db, "alunos"),
+      (snapshot) => {
+        console.log("ReportsScreen: Mudança detectada em alunos");
+        fetchData();
+      },
+      (error) => {
+        console.error("ReportsScreen: Erro ao escutar alunos:", error);
+      }
+    );
+
+    const unsubscribePrices = onSnapshot(
+      collection(db, "prices"),
+      (snapshot) => {
+        console.log("ReportsScreen: Mudança detectada em prices");
+        fetchData();
+      },
+      (error) => {
+        console.error("ReportsScreen: Erro ao escutar prices:", error);
+      }
+    );
+
+    const unsubscribeCampos = onSnapshot(
+      collection(db, "campos"),
+      (snapshot) => {
+        console.log("ReportsScreen: Mudança detectada em campos");
+        fetchData();
+      },
+      (error) => {
+        console.error("ReportsScreen: Erro ao escutar campos:", error);
+      }
+    );
+
     const unsubscribeFocus = navigation.addListener("focus", () => {
       const shouldUpdate = route.params?.shouldUpdate || false;
       if (shouldUpdate) {
-        ("ReportsScreen: Foco detectado, atualizando dados com shouldUpdate...");
+        console.log(
+          "ReportsScreen: Foco detectado, atualizando dados com shouldUpdate..."
+        );
         fetchData();
         navigation.setParams({ shouldUpdate: false });
       }
     });
 
     return () => {
-      ("ReportsScreen: Limpando listeners");
+      console.log("ReportsScreen: Limpando listeners");
       unsubscribeHorarios();
+      unsubscribeReservas();
+      unsubscribePayments();
+      unsubscribeTurmas();
+      unsubscribeAlunos();
+      unsubscribePrices();
+      unsubscribeCampos();
       unsubscribeFocus();
     };
   }, [navigation, route.params?.shouldUpdate]);
 
-  // Recalcula os horários disponíveis quando horarioOperacao mudar
   useEffect(() => {
-    if (!horarioOperacao) return; // Não recalcula até que o horário esteja carregado
+    if (!horarioOperacao) return;
 
-    "ReportsScreen: useEffect de recálculo disparado com:",
-      {
-        horarioOperacao,
-      };
+    console.log("ReportsScreen: useEffect de recálculo disparado com:", {
+      horarioOperacao,
+    });
     const recalcularHorarios = async () => {
       try {
-        ("ReportsScreen: Recalculando horários disponíveis");
+        console.log("ReportsScreen: Recalculando horários disponíveis");
         const turmas = await turmaService.getTurmas();
         const alunos = await alunoService.getAlunos();
         const reservas = (
@@ -495,7 +577,10 @@ export default function ReportsScreen({ navigation, route }) {
           prices
         );
         setHorariosDisponiveis(horarios);
-        "ReportsScreen: Horários disponíveis atualizados:", horarios;
+        console.log(
+          "ReportsScreen: Horários disponíveis atualizados:",
+          horarios
+        );
       } catch (error) {
         console.error(
           "ReportsScreen: Erro ao recalcular horários disponíveis:",
@@ -680,7 +765,8 @@ const styles = StyleSheet.create({
     padding: 15,
   },
   header: {
-    backgroundColor: "#007AFF",
+    marginTop: 40,
+    backgroundColor: "#1f2f3a",
     padding: 20,
     borderRadius: 10,
     alignItems: "center",
@@ -691,7 +777,6 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#fff",
   },
-
   section: {
     backgroundColor: "#fff",
     padding: 15,
@@ -732,7 +817,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   scheduleContainer: {
-    maxHeight: 200, // Limita a altura para scroll interno, ajuste conforme necessário
+    maxHeight: 200,
   },
   scheduleItem: {
     flexDirection: "column",
