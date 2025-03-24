@@ -50,7 +50,7 @@ export default function ReportsScreen({ navigation, route }) {
       console.log("ReportsScreen: Iniciando fetchData");
       const payments = await paymentService.getPayments();
       const turmas = await turmaService.getTurmas();
-      const alunos = await alunoService.getAlunos();
+      const alunos = await alunoService.getAlunos(); // Apenas alunos cadastrados
       const prices = await priceService.getPrices();
       const campos = await campoService.getCampos();
       const reservasSnapshot = await getDocs(query(collection(db, "reservas")));
@@ -59,15 +59,9 @@ export default function ReportsScreen({ navigation, route }) {
         ...doc.data(),
       }));
 
-      // Contar alunos (Escolinha) e reservas anuais
-      const reservasAnuais = reservas.filter(
-        (reserva) => reserva.tipo === "anual"
-      );
-      setQuantidadeAlunos(alunos.length + reservasAnuais.length);
-      console.log(
-        "ReportsScreen: Quantidade de Alunos (Anual):",
-        alunos.length + reservasAnuais.length
-      );
+      // Contar apenas alunos cadastrados (sem reservas anuais)
+      setQuantidadeAlunos(alunos.length);
+      console.log("ReportsScreen: Quantidade de Alunos:", alunos.length);
 
       // Contar turmas e reservas mensais
       const reservasMensais = reservas.filter(
@@ -79,9 +73,8 @@ export default function ReportsScreen({ navigation, route }) {
         turmas.length + reservasMensais.length
       );
 
-      setValorMensalAlunos(
-        (alunos.length + reservasAnuais.length) * prices.escolinha
-      );
+      // Valor mensal apenas para alunos cadastrados
+      setValorMensalAlunos(alunos.length * prices.escolinha);
       setValorMensalMensalistas(
         (turmas.length + reservasMensais.length) * prices.turmas
       );
@@ -94,6 +87,7 @@ export default function ReportsScreen({ navigation, route }) {
       const atrasosData = calcularAtrasos(todosItens, payments, prices);
       setAtrasos(atrasosData);
 
+      // Lucro total apenas para alunos (Escolinha)
       const lucroAnual = payments
         .filter((p) => p.tipoServico === "Escolinha")
         .reduce((sum, p) => sum + Math.max(p.valor, 0), 0);
@@ -118,7 +112,7 @@ export default function ReportsScreen({ navigation, route }) {
         primeiraReserva: primeiraReserva,
       });
 
-      // Ajuste no cálculo da média mensal de lucro
+      // Ajuste na média mensal de lucro apenas para alunos
       if (primeiraReserva) {
         const dataPrimeiraReserva = moment(reservasOrdenadas[0].data);
         const dataAtual = moment("2025-03-23");
@@ -130,26 +124,18 @@ export default function ReportsScreen({ navigation, route }) {
         }
         mesesDiferenca = Math.max(mesesDiferenca, 1);
 
-        // Contagem de reservas por tipo
-        const totalReservasAnuais = reservas.filter(
-          (r) => r.tipo === "anual"
-        ).length;
-        const totalReservasMensais = reservas.filter(
-          (r) => r.tipo === "mensal"
-        ).length;
+        // Média mensal apenas com alunos cadastrados
+        const mediaAnual =
+          alunos.length > 0
+            ? (alunos.length * prices.escolinha) / mesesDiferenca
+            : 0;
+        const mediaMensal =
+          reservasMensais.length > 0
+            ? (reservasMensais.length * prices.turmas) / mesesDiferenca
+            : 0;
         const totalReservasAvulsas = reservas.filter(
           (r) => r.tipo === "avulso"
         ).length;
-
-        // Cálculo da média mensal baseado na quantidade de reservas e seus valores
-        const mediaAnual =
-          totalReservasAnuais > 0
-            ? (totalReservasAnuais * prices.escolinha) / mesesDiferenca
-            : 0;
-        const mediaMensal =
-          totalReservasMensais > 0
-            ? (totalReservasMensais * prices.turmas) / mesesDiferenca
-            : 0;
         const mediaAvulso =
           totalReservasAvulsas > 0
             ? (totalReservasAvulsas * prices.avulso) / mesesDiferenca

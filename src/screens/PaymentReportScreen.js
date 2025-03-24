@@ -70,7 +70,7 @@ export default function PaymentReportScreen({ navigation, route }) {
         type: "turma",
       }));
 
-      // Mapear alunos
+      // Mapear alunos (apenas alunos cadastrados, sem reservas anuais)
       const alunosMapped = alunosData.map((item) => ({
         ...item,
         type: "aluno",
@@ -79,9 +79,6 @@ export default function PaymentReportScreen({ navigation, route }) {
       // Separar reservas por tipo
       const reservasMensais = reservasData
         .filter((reserva) => reserva.tipo === "mensal")
-        .map((item) => ({ ...item, type: "reserva" }));
-      const reservasAnuais = reservasData
-        .filter((reserva) => reserva.tipo === "anual")
         .map((item) => ({ ...item, type: "reserva" }));
       const reservasAvulsas = reservasData
         .filter((reserva) => reserva.tipo === "avulso" || !reserva.tipo)
@@ -95,7 +92,7 @@ export default function PaymentReportScreen({ navigation, route }) {
         },
         {
           title: "Alunos Cadastrados",
-          data: [...alunosMapped, ...reservasAnuais],
+          data: alunosMapped, // Apenas alunos, sem reservas anuais
         },
         { title: "Reservas Avulsas", data: reservasAvulsas },
       ];
@@ -106,7 +103,6 @@ export default function PaymentReportScreen({ navigation, route }) {
           ...turmasMapped,
           ...alunosMapped,
           ...reservasMensais,
-          ...reservasAnuais,
           ...reservasAvulsas,
         ].find((i) => i.id === atrasoItemId);
         if (item) handleOpenModal(item);
