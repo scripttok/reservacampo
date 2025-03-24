@@ -47,7 +47,7 @@ function CustomDrawerContent(props) {
   const { navigation, setMode, mode } = props;
 
   const handleAddCampo = () => {
-    console.log("Drawer: Navegando para Home com modal de adicionar campo");
+    ("Drawer: Navegando para Home com modal de adicionar campo");
     navigation.navigate("HomeStack", {
       screen: "Home",
       params: { openAddModal: true, mode },
@@ -56,7 +56,7 @@ function CustomDrawerContent(props) {
   };
 
   const handleConfigHorarios = () => {
-    console.log("Drawer: Navegando para Home com modal de configurar horários");
+    ("Drawer: Navegando para Home com modal de configurar horários");
     navigation.navigate("HomeStack", {
       screen: "Home",
       params: { openConfig: true, mode }, // Usando openConfig em vez de openConfigModal
