@@ -59,10 +59,32 @@ export default function ReportsScreen({ navigation, route }) {
         ...doc.data(),
       }));
 
-      setQuantidadeAlunos(alunos.length);
-      setQuantidadeMensalistas(turmas.length);
-      setValorMensalAlunos(alunos.length * prices.escolinha);
-      setValorMensalMensalistas(turmas.length * prices.turmas);
+      // Contar alunos (Escolinha) e reservas anuais
+      const reservasAnuais = reservas.filter(
+        (reserva) => reserva.tipo === "anual"
+      );
+      setQuantidadeAlunos(alunos.length + reservasAnuais.length);
+      console.log(
+        "ReportsScreen: Quantidade de Alunos (Anual):",
+        alunos.length + reservasAnuais.length
+      );
+
+      // Contar turmas e reservas mensais
+      const reservasMensais = reservas.filter(
+        (reserva) => reserva.tipo === "mensal"
+      );
+      setQuantidadeMensalistas(turmas.length + reservasMensais.length);
+      console.log(
+        "ReportsScreen: Quantidade de Mensalistas:",
+        turmas.length + reservasMensais.length
+      );
+
+      setValorMensalAlunos(
+        (alunos.length + reservasAnuais.length) * prices.escolinha
+      );
+      setValorMensalMensalistas(
+        (turmas.length + reservasMensais.length) * prices.turmas
+      );
 
       const todosItens = [
         ...turmas.map((t) => ({ ...t, type: "turma" })),
@@ -96,6 +118,7 @@ export default function ReportsScreen({ navigation, route }) {
         primeiraReserva: primeiraReserva,
       });
 
+      // Ajuste no cálculo da média mensal de lucro
       if (primeiraReserva) {
         const dataPrimeiraReserva = moment(reservasOrdenadas[0].data);
         const dataAtual = moment("2025-03-23");
@@ -107,10 +130,35 @@ export default function ReportsScreen({ navigation, route }) {
         }
         mesesDiferenca = Math.max(mesesDiferenca, 1);
 
+        // Contagem de reservas por tipo
+        const totalReservasAnuais = reservas.filter(
+          (r) => r.tipo === "anual"
+        ).length;
+        const totalReservasMensais = reservas.filter(
+          (r) => r.tipo === "mensal"
+        ).length;
+        const totalReservasAvulsas = reservas.filter(
+          (r) => r.tipo === "avulso"
+        ).length;
+
+        // Cálculo da média mensal baseado na quantidade de reservas e seus valores
+        const mediaAnual =
+          totalReservasAnuais > 0
+            ? (totalReservasAnuais * prices.escolinha) / mesesDiferenca
+            : 0;
+        const mediaMensal =
+          totalReservasMensais > 0
+            ? (totalReservasMensais * prices.turmas) / mesesDiferenca
+            : 0;
+        const mediaAvulso =
+          totalReservasAvulsas > 0
+            ? (totalReservasAvulsas * prices.avulso) / mesesDiferenca
+            : 0;
+
         setMediaMensalLucro({
-          anual: lucroAnual / mesesDiferenca,
-          mensal: lucroMensal / mesesDiferenca,
-          avulso: lucroAvulso / mesesDiferenca,
+          anual: mediaAnual,
+          mensal: mediaMensal,
+          avulso: mediaAvulso,
         });
       } else {
         setMediaMensalLucro({ anual: 0, mensal: 0, avulso: 0 });
