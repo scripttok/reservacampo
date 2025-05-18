@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   StyleSheet,
   View,
@@ -9,6 +9,7 @@ import {
   TextInput,
   Alert,
 } from "react-native";
+import moment from "moment";
 import { turmaService } from "../services/turmaService";
 import { alunoService } from "../services/alunoService";
 import { paymentService } from "../services/paymentService";
@@ -24,24 +25,37 @@ export default function PaymentReportScreen({ navigation, route }) {
   const [tipoServico, setTipoServico] = useState("");
   const [valor, setValor] = useState("");
   const [dataPagamento, setDataPagamento] = useState(
-    new Date().toISOString().split("T")[0]
+    moment().format("YYYY-MM-DD")
   );
   const [nomeResponsavel, setNomeResponsavel] = useState("");
   const [prices, setPrices] = useState({ turmas: 0, escolinha: 0, avulso: 0 });
   const [payments, setPayments] = useState([]);
-  // Novo estado para o valor da busca
   const [searchQuery, setSearchQuery] = useState("");
+  const [forceUpdate, setForceUpdate] = useState(0); // Novo estado para forçar atualização
 
   const fetchReservas = async () => {
     try {
       const reservasCol = collection(db, "reservas");
       const reservasSnapshot = await getDocs(reservasCol);
-      const reservasList = reservasSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-        type: "reserva",
-      }));
-      "PaymentReportScreen: Reservas recebidas:", reservasList;
+      const reservasList = reservasSnapshot.docs.map((doc) => {
+        const data = doc.data();
+        console.log(
+          "PaymentReportScreen: Reserva ID:",
+          doc.id,
+          "Data:",
+          data.data
+        );
+        return {
+          id: doc.id,
+          ...data,
+          type: "reserva",
+          createdAt: data.createdAt || data.data,
+        };
+      });
+      console.log(
+        "PaymentReportScreen: Reservas recebidas:",
+        reservasList.length
+      );
       return reservasList;
     } catch (error) {
       console.error("PaymentReportScreen: Erro ao buscar reservas:", error);
@@ -49,60 +63,67 @@ export default function PaymentReportScreen({ navigation, route }) {
     }
   };
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
+    console.log("PaymentReportScreen: Iniciando fetchData");
     try {
+      // Limpar estado para evitar dados antigos
+      setSections([]);
       const turmasData = await turmaService.getTurmas();
-      "Turmas recebidas:", turmasData;
+      console.log("PaymentReportScreen: Turmas recebidas:", turmasData.length);
       const alunosData = await alunoService.getAlunos();
-      "Alunos recebidos:", alunosData;
+      console.log("PaymentReportScreen: Alunos recebidos:", alunosData.length);
       const reservasData = await fetchReservas();
       const pricesData = await priceService.getPrices();
-      "Preços recebidos:", pricesData;
+      console.log("PaymentReportScreen: Preços recebidos:", pricesData);
       const paymentsData = await paymentService.getPayments();
-      "Pagamentos recebidos:", paymentsData;
+      console.log(
+        "PaymentReportScreen: Pagamentos recebidos:",
+        paymentsData.length
+      );
 
       setPrices(pricesData);
       setPayments(paymentsData);
 
-      // Mapear turmas
       const turmasMapped = turmasData.map((item) => ({
         ...item,
         type: "turma",
       }));
 
-      // Mapear alunos (apenas alunos cadastrados, sem reservas anuais)
       const alunosMapped = alunosData.map((item) => ({
         ...item,
         type: "aluno",
       }));
 
-      // Separar reservas por tipo
       const reservasMensais = reservasData
         .filter((reserva) => reserva.tipo === "mensal")
+        .map((item) => ({ ...item, type: "reserva" }));
+      const reservasAnuais = reservasData
+        .filter((reserva) => reserva.tipo === "anual")
         .map((item) => ({ ...item, type: "reserva" }));
       const reservasAvulsas = reservasData
         .filter((reserva) => reserva.tipo === "avulso" || !reserva.tipo)
         .map((item) => ({ ...item, type: "reserva" }));
 
-      // Combinar nas seções corretas
       const combinedSections = [
         {
           title: "Turmas Cadastradas",
           data: [...turmasMapped, ...reservasMensais],
         },
         {
-          title: "Alunos Cadastrados",
-          data: alunosMapped, // Apenas alunos, sem reservas anuais
+          title: "Aulas Anuais (Escolinha)",
+          data: [...alunosMapped, ...reservasAnuais],
         },
         { title: "Reservas Avulsas", data: reservasAvulsas },
       ];
       setSections(combinedSections);
+      console.log("PaymentReportScreen: Seções atualizadas:", combinedSections);
 
       if (atrasoItemId) {
         const item = [
           ...turmasMapped,
           ...alunosMapped,
           ...reservasMensais,
+          ...reservasAnuais,
           ...reservasAvulsas,
         ].find((i) => i.id === atrasoItemId);
         if (item) handleOpenModal(item);
@@ -110,13 +131,21 @@ export default function PaymentReportScreen({ navigation, route }) {
     } catch (error) {
       console.error("PaymentReportScreen: Erro ao carregar dados:", error);
     }
-  };
+  }, [atrasoItemId]);
 
   useEffect(() => {
+    console.log(
+      "PaymentReportScreen: useEffect disparado, forceUpdate:",
+      forceUpdate
+    );
     fetchData();
-    const unsubscribe = navigation.addListener("focus", fetchData);
+    const unsubscribe = navigation.addListener("focus", () => {
+      console.log("PaymentReportScreen: Tela em foco, recarregando dados");
+      setForceUpdate((prev) => prev + 1); // Forçar atualização
+      fetchData();
+    });
     return unsubscribe;
-  }, [navigation, atrasoItemId]);
+  }, [navigation, fetchData, forceUpdate]);
 
   const handleOpenModal = (item) => {
     setSelectedItem(item);
@@ -148,24 +177,12 @@ export default function PaymentReportScreen({ navigation, route }) {
 
   const calcularProximoPagamento = (createdAt) => {
     if (!createdAt) return "Indefinido";
-    const dataCriacao = new Date(createdAt);
-    const diaCadastro = dataCriacao.getDate();
-    const proximoPagamento = new Date(dataCriacao);
-
-    proximoPagamento.setMonth(proximoPagamento.getMonth() + 1);
-    proximoPagamento.setDate(1);
-    const ultimoDiaMes = new Date(
-      proximoPagamento.getFullYear(),
-      proximoPagamento.getMonth() + 1,
-      0
-    ).getDate();
-    proximoPagamento.setDate(Math.min(diaCadastro, ultimoDiaMes));
-
-    return proximoPagamento.toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
+    const dataCriacao = moment(createdAt);
+    const diaCadastro = dataCriacao.date();
+    const proximoPagamento = dataCriacao.clone().add(1, "month").date(1);
+    const ultimoDiaMes = proximoPagamento.clone().endOf("month").date();
+    proximoPagamento.date(Math.min(diaCadastro, ultimoDiaMes));
+    return proximoPagamento.format("DD/MM/YYYY");
   };
 
   const getPaymentStatus = (item) => {
@@ -174,43 +191,35 @@ export default function PaymentReportScreen({ navigation, route }) {
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
 
     const dataBase = item.type === "reserva" ? item.data : item.createdAt;
-    const diaCadastro = new Date(dataBase).getDate();
+    const diaCadastro = moment(dataBase).date();
 
     if (!lastPayment) {
-      const dataCriacao = new Date(dataBase);
-      const proximoPagamento = new Date(dataCriacao);
-      proximoPagamento.setMonth(proximoPagamento.getMonth() + 1);
-      proximoPagamento.setDate(1);
-      const ultimoDiaMes = new Date(
-        proximoPagamento.getFullYear(),
-        proximoPagamento.getMonth() + 1,
-        0
-      ).getDate();
-      proximoPagamento.setDate(Math.min(diaCadastro, ultimoDiaMes));
-      const hoje = new Date();
-      return proximoPagamento < hoje
+      const dataCriacao = moment(dataBase);
+      const proximoPagamento = dataCriacao.clone().add(1, "month").date(1);
+      const ultimoDiaMes = proximoPagamento.clone().endOf("month").date();
+      proximoPagamento.date(Math.min(diaCadastro, ultimoDiaMes));
+      const hoje = moment();
+      return proximoPagamento.isBefore(hoje)
         ? { status: "Atrasado", color: "#dc3545" }
         : null;
     }
 
-    const ultimaDataPagamento = new Date(lastPayment.createdAt);
-    const nextPaymentDate = new Date(ultimaDataPagamento);
-    nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
-    nextPaymentDate.setDate(1);
-    const ultimoDiaMes = new Date(
-      nextPaymentDate.getFullYear(),
-      nextPaymentDate.getMonth() + 1,
-      0
-    ).getDate();
-    nextPaymentDate.setDate(Math.min(diaCadastro, ultimoDiaMes));
-    const today = new Date();
-    return nextPaymentDate > today
+    const ultimaDataPagamento = moment(lastPayment.createdAt);
+    const nextPaymentDate = ultimaDataPagamento.clone().add(1, "month").date(1);
+    const ultimoDiaMes = nextPaymentDate.clone().endOf("month").date();
+    nextPaymentDate.date(Math.min(diaCadastro, ultimoDiaMes));
+    const today = moment();
+    return nextPaymentDate.isAfter(today)
       ? { status: "Pago", color: "#28a745" }
       : { status: "Atrasado", color: "#dc3545" };
   };
 
   const handleRegisterPayment = async () => {
     if (!selectedItem) return;
+    if (!moment(dataPagamento, "YYYY-MM-DD", true).isValid()) {
+      alert("Data de pagamento deve estar no formato YYYY-MM-DD!");
+      return;
+    }
     try {
       const newPayment = {
         tipoServico,
@@ -219,7 +228,7 @@ export default function PaymentReportScreen({ navigation, route }) {
         nomeResponsavel,
         itemId: selectedItem.id,
         itemNome: selectedItem.nome,
-        createdAt: new Date().toISOString(),
+        createdAt: moment().toISOString(),
       };
       await paymentService.addPayment(newPayment);
 
@@ -275,7 +284,6 @@ export default function PaymentReportScreen({ navigation, route }) {
     ]);
   };
 
-  // Função para filtrar os dados das seções
   const filterSections = (sectionsData) => {
     if (!searchQuery) return sectionsData;
 
@@ -286,7 +294,7 @@ export default function PaymentReportScreen({ navigation, route }) {
           item.nome.toLowerCase().includes(searchQuery.toLowerCase())
         ),
       }))
-      .filter((section) => section.data.length > 0); // Remove seções vazias
+      .filter((section) => section.data.length > 0);
   };
 
   const renderItem = ({ item }) => {
@@ -294,9 +302,8 @@ export default function PaymentReportScreen({ navigation, route }) {
     const valorAPagar =
       item.type === "turma"
         ? prices.turmas
-        : item.type === "aluno"
-        ? prices.escolinha
-        : item.type === "reserva" && item.tipo === "anual"
+        : item.type === "aluno" ||
+          (item.type === "reserva" && item.tipo === "anual")
         ? prices.escolinha
         : item.type === "reserva" && item.tipo === "mensal"
         ? prices.turmas
@@ -318,8 +325,7 @@ export default function PaymentReportScreen({ navigation, route }) {
               Horário: {item.inicio} - {item.fim}
             </Text>
             <Text style={styles.itemText}>
-              Data de Cadastro:{" "}
-              {new Date(item.createdAt).toLocaleDateString("pt-BR")}
+              Data de Cadastro: {moment(item.createdAt).format("DD/MM/YYYY")}
             </Text>
             <Text style={styles.itemText}>
               Próximo Pagamento: {calcularProximoPagamento(item.createdAt)}
@@ -341,7 +347,7 @@ export default function PaymentReportScreen({ navigation, route }) {
             <Text style={styles.itemText}>
               Data de Cadastro:{" "}
               {item.createdAt
-                ? new Date(item.createdAt).toLocaleDateString("pt-BR")
+                ? moment(item.createdAt).format("DD/MM/YYYY")
                 : "Não informado"}
             </Text>
             <Text style={styles.itemText}>
@@ -364,7 +370,7 @@ export default function PaymentReportScreen({ navigation, route }) {
             <Text style={styles.itemText}>Responsável: {item.responsavel}</Text>
             <Text style={styles.itemText}>Telefone: {item.telefone}</Text>
             <Text style={styles.itemText}>
-              Data: {new Date(item.data).toLocaleDateString("pt-BR")}
+              Data: {moment(item.data).format("DD/MM/YYYY")}
             </Text>
             <Text style={styles.itemText}>
               Horário: {item.horarioInicio} - {item.horarioFim}
@@ -398,15 +404,12 @@ export default function PaymentReportScreen({ navigation, route }) {
       <View style={styles.header}>
         <Text style={styles.title}>Relatório de Pagamentos</Text>
       </View>
-
-      {/* Novo campo de busca */}
       <TextInput
         style={styles.searchInput}
         placeholder="Buscar por nome..."
         value={searchQuery}
         onChangeText={setSearchQuery}
       />
-
       <SectionList
         sections={filterSections(sections)}
         renderItem={renderItem}
@@ -425,7 +428,6 @@ export default function PaymentReportScreen({ navigation, route }) {
         )}
         stickySectionHeadersEnabled={true}
       />
-
       <Modal
         animationType="slide"
         transparent={true}
@@ -437,9 +439,7 @@ export default function PaymentReportScreen({ navigation, route }) {
             <Text style={styles.modalTitle}>
               {selectedItem ? `${selectedItem.nome} - Ações` : "Ações"}
             </Text>
-
             <Text style={styles.label}>Registrar Pagamento</Text>
-
             <View style={styles.serviceButtons}>
               <TouchableOpacity
                 style={[
@@ -478,7 +478,6 @@ export default function PaymentReportScreen({ navigation, route }) {
                 <Text style={styles.serviceButtonText}>Avulso</Text>
               </TouchableOpacity>
             </View>
-
             <Text style={styles.label}>Valor (R$)</Text>
             <TextInput
               style={styles.input}
@@ -487,7 +486,6 @@ export default function PaymentReportScreen({ navigation, route }) {
               value={valor}
               onChangeText={setValor}
             />
-
             <Text style={styles.label}>Data do Pagamento</Text>
             <TextInput
               style={styles.input}
@@ -495,7 +493,6 @@ export default function PaymentReportScreen({ navigation, route }) {
               value={dataPagamento}
               onChangeText={setDataPagamento}
             />
-
             <Text style={styles.label}>Nome do Responsável</Text>
             <TextInput
               style={styles.input}
@@ -503,7 +500,6 @@ export default function PaymentReportScreen({ navigation, route }) {
               value={nomeResponsavel}
               onChangeText={setNomeResponsavel}
             />
-
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={styles.actionButton}
@@ -692,7 +688,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
   },
-  // Novo estilo para o campo de busca
   searchInput: {
     width: "100%",
     padding: 10,
