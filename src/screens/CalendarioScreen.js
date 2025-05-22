@@ -74,7 +74,7 @@ LocaleConfig.locales["pt"] = {
 LocaleConfig.defaultLocale = "pt";
 
 export default function CalendarioScreen({ navigation }) {
-  ("CalendarioScreen: Componente montado");
+  console.log("CalendarioScreen: Componente montado");
 
   const [selectedDate, setSelectedDate] = useState(
     moment().format("YYYY-MM-DD")
@@ -117,7 +117,7 @@ export default function CalendarioScreen({ navigation }) {
   const [isSaving, setIsSaving] = useState(false);
 
   const fetchReservas = useCallback(async () => {
-    ("CalendarioScreen: fetchReservas iniciado");
+    console.log("CalendarioScreen: fetchReservas iniciado");
     try {
       const reservasRef = collection(db, "reservas");
       const q = query(reservasRef);
@@ -126,8 +126,10 @@ export default function CalendarioScreen({ navigation }) {
       querySnapshot.forEach((doc) => {
         reservasData.push({ id: doc.id, ...doc.data() });
       });
-      "CalendarioScreen: fetchReservas concluído, reservas:",
-        reservasData.length;
+      console.log(
+        "CalendarioScreen: fetchReservas concluído, reservas:",
+        reservasData.length
+      );
       return reservasData;
     } catch (error) {
       console.error("CalendarioScreen: Erro em fetchReservas:", error);
@@ -136,28 +138,30 @@ export default function CalendarioScreen({ navigation }) {
   }, []);
 
   const fetchData = useCallback(async () => {
-    "CalendarioScreen: fetchData chamado, needsFetch:", needsFetch;
+    console.log("CalendarioScreen: fetchData chamado, needsFetch:", needsFetch);
     if (!needsFetch) {
-      ("CalendarioScreen: fetchData ignorado, já buscado");
+      console.log("CalendarioScreen: fetchData ignorado, já buscado");
       return;
     }
-    ("CalendarioScreen: Iniciando busca de dados");
+    console.log("CalendarioScreen: Iniciando busca de dados");
     setIsLoading(true);
     try {
       const camposData = await campoService.getCampos();
-      "CalendarioScreen: Campos carregados:", camposData;
+      console.log("CalendarioScreen: Campos carregados:", camposData);
       setCampos(camposData);
       const reservasData = await fetchReservas();
-      "CalendarioScreen: Reservas carregadas:", reservasData;
+      console.log("CalendarioScreen: Reservas carregadas:", reservasData);
       setReservas(reservasData);
       if (camposData.length > 0 && !selectedCampoId) {
-        "CalendarioScreen: Definindo selectedCampoId inicial:",
-          camposData[0].id;
+        console.log(
+          "CalendarioScreen: Definindo selectedCampoId inicial:",
+          camposData[0].id
+        );
         setSelectedCampoId(camposData[0].id);
       }
       setIsLoading(false);
       setNeedsFetch(false);
-      ("CalendarioScreen: fetchData concluído");
+      console.log("CalendarioScreen: fetchData concluído");
       updateMarkedDates(reservasData, selectedDate);
     } catch (error) {
       console.error("CalendarioScreen: Erro ao buscar dados:", error);
@@ -173,14 +177,14 @@ export default function CalendarioScreen({ navigation }) {
 
   // useEffect inicial para carregar dados
   useEffect(() => {
-    ("CalendarioScreen: Primeiro useEffect disparado");
+    console.log("CalendarioScreen: Primeiro useEffect disparado");
     fetchData();
   }, [fetchData]);
 
   // useEffect para atualizar ao voltar da tela AddTurma
   useEffect(() => {
     const unsubscribe = navigation.addListener("focus", () => {
-      ("CalendarioScreen: Tela em foco, forçando fetchData");
+      console.log("CalendarioScreen: Tela em foco, forçando fetchData");
       setNeedsFetch(true);
       fetchData();
     });
@@ -189,8 +193,10 @@ export default function CalendarioScreen({ navigation }) {
 
   // useEffect para atualizar markedDates ao mudar o campo selecionado
   useEffect(() => {
-    "CalendarioScreen: useEffect de selectedCampoId disparado, campo:",
-      selectedCampoId;
+    console.log(
+      "CalendarioScreen: useEffect de selectedCampoId disparado, campo:",
+      selectedCampoId
+    );
     if (selectedCampoId && reservas.length > 0) {
       updateMarkedDates(reservas, selectedDate);
     }
@@ -198,12 +204,14 @@ export default function CalendarioScreen({ navigation }) {
 
   const generateMarkedDates = useMemo(() => {
     return (reservasData, selected, rentalDates) => {
-      "CalendarioScreen: generateMarkedDates chamado com reservas:",
+      console.log(
+        "CalendarioScreen: generateMarkedDates chamado com reservas:",
         reservasData.length,
         "selected:",
         selected,
         "rentalDates:",
-        Object.keys(rentalDates);
+        Object.keys(rentalDates)
+      );
       const marked = {};
       reservasData
         .filter((reserva) => reserva.campoId === selectedCampoId)
@@ -265,8 +273,10 @@ export default function CalendarioScreen({ navigation }) {
         selectedColor: "#007AFF",
       };
 
-      "CalendarioScreen: Novos markedDates calculados:",
-        Object.keys(marked).length;
+      console.log(
+        "CalendarioScreen: Novos markedDates calculados:",
+        Object.keys(marked).length
+      );
       return marked;
     };
   }, [selectedCampoId]);
@@ -289,7 +299,10 @@ export default function CalendarioScreen({ navigation }) {
             JSON.stringify(prev[key]) !== JSON.stringify(newMarkedDates[key])
         );
         const hasChanged = keysChanged || valuesChanged;
-        "CalendarioScreen: Comparando markedDates, mudou?", hasChanged;
+        console.log(
+          "CalendarioScreen: Comparando markedDates, mudou?",
+          hasChanged
+        );
         return hasChanged ? newMarkedDates : prev;
       });
     },
@@ -298,14 +311,17 @@ export default function CalendarioScreen({ navigation }) {
 
   const fetchReservasDoDia = useCallback(
     async (date) => {
-      "CalendarioScreen: fetchReservasDoDia iniciado para", date;
+      console.log("CalendarioScreen: fetchReservasDoDia iniciado para", date);
       try {
         const diaSemana = moment(date)
           .format("dddd")
           .toLowerCase()
           .replace("-feira", "");
+        console.log("CalendarioScreen: Dia da semana:", diaSemana);
         const turmas = await turmaService.getTurmas();
+        console.log("CalendarioScreen: Turmas carregadas:", turmas.length);
         const aulas = await escolinhaService.getAulas();
+        console.log("CalendarioScreen: Aulas carregadas:", aulas.length);
         const reservasFirestore = reservas.filter((reserva) => {
           const reservaDate = moment(reserva.data);
           const isSameDate = reservaDate.format("YYYY-MM-DD") === date;
@@ -327,8 +343,21 @@ export default function CalendarioScreen({ navigation }) {
               null,
               "[]"
             );
-          return isSameDate || isMensal || isAnual;
+          const isRelevant = isSameDate || isMensal || isAnual;
+          if (isRelevant) {
+            console.log(
+              "CalendarioScreen: Reserva Firestore incluída:",
+              reserva.id,
+              reserva.tipo,
+              reserva.data
+            );
+          }
+          return isRelevant;
         });
+        console.log(
+          "CalendarioScreen: Reservas Firestore filtradas:",
+          reservasFirestore.length
+        );
 
         const reservasDia = [
           ...turmas.filter(
@@ -343,8 +372,17 @@ export default function CalendarioScreen({ navigation }) {
             b.inicio || b.horarioInicio
           )
         );
-        "CalendarioScreen: fetchReservasDoDia concluído, reservas do dia:",
-          reservasDia.length;
+        console.log(
+          "CalendarioScreen: fetchReservasDoDia concluído, reservas do dia:",
+          reservasDia.length,
+          reservasDia.map((r) => ({
+            id: r.id,
+            nome: r.nome,
+            horarioInicio: r.horarioInicio || r.inicio,
+            horarioFim: r.horarioFim || r.fim,
+            tipo: r.tipo,
+          }))
+        );
         return reservasDia;
       } catch (error) {
         console.error("CalendarioScreen: Erro em fetchReservasDoDia:", error);
@@ -360,29 +398,64 @@ export default function CalendarioScreen({ navigation }) {
     reservasExistentes,
     reservaId = null
   ) => {
-    "CalendarioScreen: Verificando conflito de horário, início:",
+    console.log(
+      "CalendarioScreen: Verificando conflito de horário, início:",
       inicio,
       "fim:",
-      fim;
+      fim,
+      "reservaId ignorada:",
+      reservaId
+    );
     const newStart = moment(inicio, "HH:mm");
     const newEnd = moment(fim, "HH:mm");
-    const conflict = reservasExistentes.some((reserva) => {
-      if (reservaId && reserva.id === reservaId) return false;
+    console.log(
+      "CalendarioScreen: Novo horário parsed - início:",
+      newStart.format("HH:mm"),
+      "fim:",
+      newEnd.format("HH:mm")
+    );
+    let conflict = false;
+    reservasExistentes.forEach((reserva) => {
+      if (reservaId && reserva.id === reservaId) {
+        console.log(
+          "CalendarioScreen: Ignorando reserva com mesmo ID:",
+          reserva.id
+        );
+        return;
+      }
       const existingStart = moment(
         reserva.inicio || reserva.horarioInicio,
         "HH:mm"
       );
       const existingEnd = moment(reserva.fim || reserva.horarioFim, "HH:mm");
-      return newStart.isBefore(existingEnd) && newEnd.isAfter(existingStart);
+      console.log(
+        "CalendarioScreen: Comparando com reserva existente:",
+        reserva.id || reserva.nome,
+        "início:",
+        existingStart.format("HH:mm"),
+        "fim:",
+        existingEnd.format("HH:mm")
+      );
+      if (newStart.isBefore(existingEnd) && newEnd.isAfter(existingStart)) {
+        console.log(
+          "CalendarioScreen: Conflito detectado com reserva:",
+          reserva.id || reserva.nome,
+          "tipo:",
+          reserva.tipo,
+          "horário:",
+          `${existingStart.format("HH:mm")} - ${existingEnd.format("HH:mm")}`
+        );
+        conflict = true;
+      }
     });
-    "CalendarioScreen: Conflito encontrado?", conflict;
+    console.log("CalendarioScreen: Conflito encontrado?", conflict);
     return conflict;
   };
 
   const handleDayPress = useCallback(
     (day) => {
       const date = day.dateString;
-      "CalendarioScreen: handleDayPress, dia pressionado:", date;
+      console.log("CalendarioScreen: handleDayPress, dia pressionado:", date);
       if (selectionMode) {
         const newSelectedDates = { ...selectedRentalDates };
         if (newSelectedDates[date]) {
@@ -390,20 +463,22 @@ export default function CalendarioScreen({ navigation }) {
         } else {
           newSelectedDates[date] = true;
         }
-        "CalendarioScreen: Modo seleção, novos selectedRentalDates:",
-          Object.keys(newSelectedDates);
+        console.log(
+          "CalendarioScreen: Modo seleção, novos selectedRentalDates:",
+          Object.keys(newSelectedDates)
+        );
         setSelectedRentalDates(newSelectedDates);
         updateMarkedDates(reservas, selectedDate, newSelectedDates);
       } else {
-        ("CalendarioScreen: Modo normal, definindo selectedDate");
+        console.log("CalendarioScreen: Modo normal, definindo selectedDate");
         setSelectedDate(date);
         if (!selectedCampoId) {
-          ("CalendarioScreen: Nenhum campo selecionado");
+          console.log("CalendarioScreen: Nenhum campo selecionado");
           alert("Por favor, selecione um campo antes de continuar!");
           return;
         }
         fetchReservasDoDia(date).then((data) => {
-          "CalendarioScreen: Reservas do dia carregadas:", data;
+          console.log("CalendarioScreen: Reservas do dia carregadas:", data);
           setReservasDoDia(data);
           setModalVisible(true);
         });
@@ -416,11 +491,12 @@ export default function CalendarioScreen({ navigation }) {
       reservas,
       selectedDate,
       updateMarkedDates,
+      fetchReservasDoDia,
     ]
   );
 
   const handleEditReserva = useCallback((reserva) => {
-    "CalendarioScreen: handleEditReserva, reserva:", reserva.id;
+    console.log("CalendarioScreen: handleEditReserva, reserva:", reserva.id);
     setSelectedReserva(reserva);
     setEditNome(reserva.nome);
     setEditResponsavel(reserva.responsavel);
@@ -488,7 +564,6 @@ export default function CalendarioScreen({ navigation }) {
       updateMarkedDates(updatedReservas, selectedDate);
       setEditModalVisible(false);
       setNeedsFetch(true);
-      // Sinaliza que ReportsScreen deve atualizar
       navigation.setParams({ shouldUpdate: true });
     } catch (error) {
       console.error("CalendarioScreen: Erro ao atualizar reserva:", error);
@@ -515,7 +590,6 @@ export default function CalendarioScreen({ navigation }) {
               setReservasDoDia(await fetchReservasDoDia(selectedDate));
               updateMarkedDates(updatedReservas, selectedDate);
               setNeedsFetch(true);
-              // Sinaliza que ReportsScreen deve atualizar
               navigation.setParams({ shouldUpdate: true });
             } catch (error) {
               console.error(
@@ -530,8 +604,169 @@ export default function CalendarioScreen({ navigation }) {
     );
   };
 
+  const handleRenewReserva = useCallback(async () => {
+    console.log("CalendarioScreen: handleRenewReserva iniciado");
+    if (!selectedReserva || selectedReserva.tipo !== "mensal") {
+      console.log(
+        "CalendarioScreen: Renovação inválida, selectedReserva:",
+        selectedReserva,
+        "tipo:",
+        selectedReserva?.tipo
+      );
+      Alert.alert("Erro", "A renovação só é permitida para reservas mensais.");
+      return;
+    }
+
+    console.log(
+      "CalendarioScreen: Renovando reserva:",
+      selectedReserva.id,
+      "data:",
+      selectedReserva.data,
+      "horário:",
+      `${selectedReserva.horarioInicio} - ${selectedReserva.horarioFim}`,
+      "selectedDate:",
+      selectedDate
+    );
+
+    try {
+      const originalDate = moment(selectedReserva.data);
+      const dayOfWeek = originalDate.day(); // Ex.: 5 para sexta-feira
+      const renewalBase = moment(selectedDate).clone().startOf("day");
+      // Ajustar renewalStart para a próxima sexta-feira após selectedDate
+      let renewalStart = renewalBase.clone().day(dayOfWeek);
+      if (renewalStart.isSameOrBefore(renewalBase)) {
+        renewalStart.add(1, "week");
+      }
+      // Calcular targetDate como selectedDate + 1 mês
+      const targetDate = renewalBase.clone().add(1, "month");
+      // Encontrar a sexta-feira mais próxima de targetDate (anterior ou igual)
+      let renewalEnd = targetDate.clone().day(dayOfWeek);
+      if (renewalEnd.isAfter(targetDate)) {
+        renewalEnd.subtract(1, "week");
+      }
+      console.log(
+        "CalendarioScreen: targetDate:",
+        targetDate.format("YYYY-MM-DD"),
+        "renewalStart:",
+        renewalStart.format("YYYY-MM-DD"),
+        "renewalEnd:",
+        renewalEnd.format("YYYY-MM-DD")
+      );
+
+      const newReservasDates = [];
+      let currentDate = renewalStart.clone();
+      const existingDates = reservas.map((r) => r.data);
+      while (currentDate.isSameOrBefore(renewalEnd)) {
+        const dateStr = currentDate.format("YYYY-MM-DD");
+        if (!existingDates.includes(dateStr)) {
+          newReservasDates.push(dateStr);
+        } else {
+          console.log(
+            "CalendarioScreen: Data já reservada, ignorando:",
+            dateStr
+          );
+        }
+        currentDate.add(1, "week");
+      }
+      console.log(
+        "CalendarioScreen: Novas datas geradas para renovação:",
+        newReservasDates
+      );
+
+      if (newReservasDates.length === 0) {
+        console.log("CalendarioScreen: Nenhuma data válida para renovação");
+        Alert.alert(
+          "Erro",
+          "Não foi possível gerar datas para a renovação. Todas as datas já estão reservadas ou a data selecionada é inválida."
+        );
+        return;
+      }
+
+      for (const date of newReservasDates) {
+        console.log("CalendarioScreen: Verificando conflitos para data:", date);
+        const reservasDia = await fetchReservasDoDia(date);
+        console.log(
+          "CalendarioScreen: Reservas do dia para verificação:",
+          reservasDia.map((r) => ({
+            id: r.id,
+            nome: r.nome,
+            horarioInicio: r.horarioInicio || r.inicio,
+            horarioFim: r.horarioFim || r.fim,
+            tipo: r.tipo,
+          }))
+        );
+        if (
+          hasTimeConflict(
+            selectedReserva.horarioInicio,
+            selectedReserva.horarioFim,
+            reservasDia,
+            selectedReserva.id
+          )
+        ) {
+          console.log(
+            "CalendarioScreen: Conflito de horário detectado para:",
+            date
+          );
+          Alert.alert(
+            "Erro",
+            `Conflito de horário em ${moment(date).format("DD/MM/YYYY")}.`
+          );
+          return;
+        }
+        console.log("CalendarioScreen: Nenhum conflito encontrado para:", date);
+      }
+
+      const newReservas = [];
+      for (const date of newReservasDates) {
+        const newReserva = {
+          data: date,
+          horarioInicio: selectedReserva.horarioInicio,
+          horarioFim: selectedReserva.horarioFim,
+          nome: selectedReserva.nome,
+          responsavel: selectedReserva.responsavel,
+          telefone: selectedReserva.telefone,
+          campoId: selectedReserva.campoId,
+          tipo: "mensal",
+        };
+        console.log(
+          "CalendarioScreen: Criando nova reserva para:",
+          date,
+          newReserva
+        );
+        const docRef = await addDoc(collection(db, "reservas"), newReserva);
+        newReservas.push({ id: docRef.id, ...newReserva });
+        console.log("CalendarioScreen: Nova reserva criada, ID:", docRef.id);
+      }
+
+      const updatedReservas = [...reservas, ...newReservas];
+      console.log(
+        "CalendarioScreen: Reservas atualizadas, total:",
+        updatedReservas.length
+      );
+      setReservas(updatedReservas);
+      setReservasDoDia(await fetchReservasDoDia(selectedDate));
+      updateMarkedDates(updatedReservas, selectedDate);
+      setEditModalVisible(false);
+      setNeedsFetch(true);
+      navigation.setParams({ shouldUpdate: true });
+      console.log("CalendarioScreen: Renovação concluída com sucesso");
+      Alert.alert("Sucesso", "Reserva renovada para o próximo mês!");
+    } catch (error) {
+      console.error("CalendarioScreen: Erro ao renovar reserva:", error);
+      Alert.alert("Erro", "Não foi possível renovar a reserva.");
+    }
+  }, [
+    selectedReserva,
+    reservas,
+    selectedDate,
+    selectedCampoId,
+    fetchReservasDoDia,
+    updateMarkedDates,
+    navigation,
+  ]);
+
   const handleAddReservaMensal = useCallback(() => {
-    ("CalendarioScreen: handleAddReservaMensal iniciado");
+    console.log("CalendarioScreen: handleAddReservaMensal iniciado");
     const reservasDia = reservasDoDia;
     setModalVisible(false);
     navigation.navigate("HomeStack", {
@@ -543,11 +778,11 @@ export default function CalendarioScreen({ navigation }) {
         reservasExistentes: reservasDia,
       },
     });
-    ("CalendarioScreen: Navegando para AddTurma");
+    console.log("CalendarioScreen: Navegando para AddTurma");
   }, [navigation, selectedDate, selectedCampoId, reservasDoDia]);
 
   const handleAddAvulso = useCallback(() => {
-    ("CalendarioScreen: handleAddAvulso iniciado");
+    console.log("CalendarioScreen: handleAddAvulso iniciado");
     setAvulsoNome("");
     setAvulsoResponsavel("");
     setAvulsoTelefone("");
@@ -604,7 +839,6 @@ export default function CalendarioScreen({ navigation }) {
       updateMarkedDates(updatedReservas, selectedDate);
       setAddAvulsoModalVisible(false);
       setNeedsFetch(true);
-      // Sinaliza que ReportsScreen deve atualizar
       navigation.setParams({ shouldUpdate: true });
     } catch (error) {
       console.error("CalendarioScreen: Erro ao salvar reserva avulsa:", error);
@@ -613,7 +847,7 @@ export default function CalendarioScreen({ navigation }) {
   };
 
   const handleAddAula = useCallback(() => {
-    ("CalendarioScreen: handleAddAula iniciado");
+    console.log("CalendarioScreen: handleAddAula iniciado");
     setAulaNome("");
     setAulaResponsavel("");
     setAulaTelefone("");
@@ -723,7 +957,6 @@ export default function CalendarioScreen({ navigation }) {
       updateMarkedDates(updatedReservas, selectedDate);
       setAddAulaModalVisible(false);
       setNeedsFetch(true);
-      // Sinaliza que ReportsScreen deve atualizar
       navigation.setParams({ shouldUpdate: true });
     } catch (error) {
       console.error("CalendarioScreen: Erro ao salvar reserva anual:", error);
@@ -734,7 +967,10 @@ export default function CalendarioScreen({ navigation }) {
   };
 
   const toggleSelectionMode = useCallback(() => {
-    "CalendarioScreen: toggleSelectionMode, novo estado:", !selectionMode;
+    console.log(
+      "CalendarioScreen: toggleSelectionMode, novo estado:",
+      !selectionMode
+    );
     setSelectionMode((prev) => !prev);
     if (selectionMode) {
       setSelectedRentalDates({});
@@ -743,9 +979,9 @@ export default function CalendarioScreen({ navigation }) {
   }, [selectionMode, reservas, selectedDate, updateMarkedDates]);
 
   const handleConfirmRental = useCallback(() => {
-    ("CalendarioScreen: handleConfirmRental iniciado");
+    console.log("CalendarioScreen: handleConfirmRental iniciado");
     if (Object.keys(selectedRentalDates).length === 0) {
-      ("CalendarioScreen: Nenhum dia selecionado para aluguel");
+      console.log("CalendarioScreen: Nenhum dia selecionado para aluguel");
       Alert.alert("Erro", "Nenhum dia selecionado para aluguel!");
       return;
     }
@@ -817,7 +1053,6 @@ export default function CalendarioScreen({ navigation }) {
       setSelectionMode(false);
       setAddRentalModalVisible(false);
       setNeedsFetch(true);
-      // Sinaliza que ReportsScreen deve atualizar
       navigation.setParams({ shouldUpdate: true });
     } catch (error) {
       console.error(
@@ -830,7 +1065,10 @@ export default function CalendarioScreen({ navigation }) {
 
   const renderReservaItem = useCallback(
     ({ item }) => {
-      "CalendarioScreen: Renderizando reserva:", item.id || item.nome;
+      console.log(
+        "CalendarioScreen: Renderizando reserva:",
+        item.id || item.nome
+      );
       return (
         <TouchableOpacity
           style={styles.reservaItem}
@@ -858,7 +1096,7 @@ export default function CalendarioScreen({ navigation }) {
     [handleEditReserva]
   );
 
-  ("CalendarioScreen: Renderizando componente");
+  console.log("CalendarioScreen: Renderizando componente");
   return (
     <View style={styles.container}>
       <Text style={styles.label}>Selecione um Campo:</Text>
@@ -866,7 +1104,10 @@ export default function CalendarioScreen({ navigation }) {
       <Picker
         selectedValue={selectedCampoId}
         onValueChange={(itemValue) => {
-          "CalendarioScreen: Picker mudou, novo selectedCampoId:", itemValue;
+          console.log(
+            "CalendarioScreen: Picker mudou, novo selectedCampoId:",
+            itemValue
+          );
           setSelectedCampoId(itemValue);
         }}
         style={styles.picker}
@@ -1017,6 +1258,14 @@ export default function CalendarioScreen({ navigation }) {
               value={editHorarioFim}
               onChangeText={setEditHorarioFim}
             />
+            {selectedReserva?.tipo === "mensal" && (
+              <TouchableOpacity
+                style={styles.saveButton}
+                onPress={handleRenewReserva}
+              >
+                <Text style={styles.saveButtonText}>Renovar</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               style={styles.saveButton}
               onPress={handleSaveEdit}
@@ -1217,7 +1466,6 @@ const styles = StyleSheet.create({
   legendContainer: { marginBottom: 4, marginTop: 30 },
   legendText: { fontSize: 14, marginBottom: 2 },
   picker: {
-    // marginTop: 30,
     height: 50,
     width: "100%",
     marginBottom: 20,
