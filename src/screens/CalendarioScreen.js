@@ -212,33 +212,89 @@ export default function CalendarioScreen({ navigation }) {
         "rentalDates:",
         Object.keys(rentalDates)
       );
+      console.log(
+        "CalendarioScreen: Reservas filtradas para o campo:",
+        reservasData
+          .filter((reserva) => reserva.campoId === selectedCampoId)
+          .map((r) => ({
+            id: r.id,
+            data: r.data,
+            tipo: r.tipo,
+          }))
+      );
       const marked = {};
+      const selectedDate = selected
+        ? moment(selected).startOf("day")
+        : moment().startOf("day");
+      const endOfPeriod = selectedDate.clone().add(30, "days");
+
       reservasData
         .filter((reserva) => reserva.campoId === selectedCampoId)
         .forEach((reserva) => {
           const dataInicial = moment(reserva.data);
           const dateStr = dataInicial.format("YYYY-MM-DD");
-          if (reserva.tipo === "mensal") {
+          console.log(
+            "CalendarioScreen: Processando reserva id=",
+            reserva.id,
+            "data=",
+            dateStr,
+            "tipo=",
+            reserva.tipo
+          );
+          // Normalizar o tipo para evitar problemas de capitalização
+          const tipo = reserva.tipo
+            ? reserva.tipo.trim().toLowerCase()
+            : "avulso";
+          if (tipo === "mensal") {
+            // Marcar a data explícita da reserva
+            console.log(
+              "CalendarioScreen: Marcando data mensal (exata):",
+              dateStr
+            );
+            marked[dateStr] = {
+              selected: true,
+              selectedColor: "#28A745", // Verde para mensal
+            };
+            // Marcar semanas nos 30 dias a partir de selected
             const diaSemana = dataInicial.day();
-            const startOfPeriod = dataInicial.clone().startOf("day");
-            const endOfPeriod = dataInicial
-              .clone()
-              .add(1, "month")
-              .startOf("day");
-            let currentDate = startOfPeriod.clone();
+            let currentDate = selectedDate.clone();
+            // Ajustar para a primeira ocorrência do dia da semana
+            while (currentDate.day() !== diaSemana) {
+              currentDate.add(1, "day");
+            }
+            console.log(
+              "CalendarioScreen: Reserva mensal do dia",
+              dateStr,
+              "marcando todas as",
+              ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"][diaSemana],
+              "de",
+              selectedDate.format("YYYY-MM-DD"),
+              "até",
+              endOfPeriod.format("YYYY-MM-DD")
+            );
             while (currentDate.isSameOrBefore(endOfPeriod)) {
-              if (currentDate.day() === diaSemana) {
-                const mensalDateStr = currentDate.format("YYYY-MM-DD");
-                marked[mensalDateStr] = {
-                  selected: true,
-                  selectedColor: "#28A745",
-                };
-              }
+              const mensalDateStr = currentDate.format("YYYY-MM-DD");
+              console.log(
+                "CalendarioScreen: Marcando data mensal:",
+                mensalDateStr
+              );
+              marked[mensalDateStr] = {
+                selected: true,
+                selectedColor: "#28A745", // Verde para mensal
+              };
               currentDate.add(1, "week");
             }
-          } else if (reserva.tipo === "avulso") {
-            marked[dateStr] = { selected: true, selectedColor: "#FFA500" };
-          } else if (reserva.tipo === "anual") {
+          } else if (tipo === "avulso") {
+            console.log("CalendarioScreen: Marcando data avulso:", dateStr);
+            marked[dateStr] = {
+              selected: true,
+              selectedColor: "#FFA500", // Laranja para avulso
+            };
+          } else if (tipo === "anual") {
+            console.log(
+              "CalendarioScreen: Processando reserva anual:",
+              dateStr
+            );
             const diaSemana = dataInicial.day();
             const startOfPeriod = dataInicial.clone().startOf("day");
             const endOfPeriod = dataInicial
@@ -249,34 +305,55 @@ export default function CalendarioScreen({ navigation }) {
             while (currentDate.isSameOrBefore(endOfPeriod)) {
               if (currentDate.day() === diaSemana) {
                 const anualDateStr = currentDate.format("YYYY-MM-DD");
+                console.log(
+                  "CalendarioScreen: Marcando data anual:",
+                  anualDateStr
+                );
                 marked[anualDateStr] = {
                   selected: true,
-                  selectedColor: "#800080",
+                  selectedColor: "#800080", // Roxo para anual
                 };
               }
               currentDate.add(1, "week");
             }
+          } else {
+            console.log(
+              "CalendarioScreen: Tipo desconhecido para reserva:",
+              reserva.id,
+              "tipo:",
+              reserva.tipo,
+              "marcando como avulso"
+            );
+            marked[dateStr] = {
+              selected: true,
+              selectedColor: "#FFA500", // Laranja como fallback
+            };
           }
         });
 
       Object.keys(rentalDates).forEach((date) => {
+        console.log("CalendarioScreen: Marcando rentalDate:", date);
         marked[date] = {
           ...marked[date],
           selected: true,
-          selectedColor: "#00FF00",
+          selectedColor: "#00FF00", // Verde claro para rentalDates
         };
       });
 
-      marked[selected] = {
-        ...marked[selected],
-        selected: true,
-        selectedColor: "#007AFF",
-      };
+      if (selected) {
+        console.log("CalendarioScreen: Marcando data selecionada:", selected);
+        marked[selected] = {
+          ...marked[selected],
+          selected: true,
+          selectedColor: "#007AFF", // Azul para data selecionada
+        };
+      }
 
       console.log(
-        "CalendarioScreen: Novos markedDates calculados:",
+        "CalendarioScreen: Novos markedDates calculados, total:",
         Object.keys(marked).length
       );
+      console.log("CalendarioScreen: Datas marcadas:", Object.keys(marked));
       return marked;
     };
   }, [selectedCampoId]);
@@ -367,15 +444,27 @@ export default function CalendarioScreen({ navigation }) {
             (a) => a.dia === diaSemana && a.campoId === selectedCampoId
           ),
           ...reservasFirestore.filter((r) => r.campoId === selectedCampoId),
+          // Incluir reservas explícitas para a data exata
+          ...reservas.filter(
+            (r) =>
+              r.campoId === selectedCampoId &&
+              moment(r.data).format("YYYY-MM-DD") === date
+          ),
         ].sort((a, b) =>
           (a.inicio || a.horarioInicio).localeCompare(
             b.inicio || b.horarioInicio
           )
         );
+        // Remover duplicatas por ID
+        const uniqueReservasDia = Array.from(
+          new Map(
+            reservasDia.map((r) => [r.id || `${r.nome}-${r.horarioInicio}`, r])
+          ).values()
+        );
         console.log(
           "CalendarioScreen: fetchReservasDoDia concluído, reservas do dia:",
-          reservasDia.length,
-          reservasDia.map((r) => ({
+          uniqueReservasDia.length,
+          uniqueReservasDia.map((r) => ({
             id: r.id,
             nome: r.nome,
             horarioInicio: r.horarioInicio || r.inicio,
@@ -383,7 +472,7 @@ export default function CalendarioScreen({ navigation }) {
             tipo: r.tipo,
           }))
         );
-        return reservasDia;
+        return uniqueReservasDia;
       } catch (error) {
         console.error("CalendarioScreen: Erro em fetchReservasDoDia:", error);
         return [];
