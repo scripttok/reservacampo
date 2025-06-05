@@ -719,16 +719,16 @@ export default function CalendarioScreen({ navigation }) {
 
     try {
       const originalDate = moment(selectedReserva.data);
-      const dayOfWeek = originalDate.day(); // Ex.: 5 para sexta-feira
+      const dayOfWeek = originalDate.day(); // Ex.: 5 para quinta-feira
       const renewalBase = moment(selectedDate).clone().startOf("day");
-      // Ajustar renewalStart para a próxima sexta-feira após selectedDate
+      // Ajustar renewalStart para a próxima quinta-feira após selectedDate
       let renewalStart = renewalBase.clone().day(dayOfWeek);
       if (renewalStart.isSameOrBefore(renewalBase)) {
         renewalStart.add(1, "week");
       }
       // Calcular targetDate como selectedDate + 1 mês
       const targetDate = renewalBase.clone().add(1, "month");
-      // Encontrar a sexta-feira mais próxima de targetDate (anterior ou igual)
+      // Encontrar a quinta-feira mais próxima de targetDate (anterior ou igual)
       let renewalEnd = targetDate.clone().day(dayOfWeek);
       if (renewalEnd.isAfter(targetDate)) {
         renewalEnd.subtract(1, "week");
@@ -784,11 +784,16 @@ export default function CalendarioScreen({ navigation }) {
             tipo: r.tipo,
           }))
         );
+        // Ignorar conflito com a reserva atual se a data for a mesma da selectedReserva
+        const filteredReservasDia = reservasDia.filter(
+          (r) =>
+            !(r.id === selectedReserva.id && r.data === selectedReserva.data)
+        );
         if (
           hasTimeConflict(
             selectedReserva.horarioInicio,
             selectedReserva.horarioFim,
-            reservasDia,
+            filteredReservasDia,
             selectedReserva.id
           )
         ) {
