@@ -226,18 +226,21 @@ export default function AddTurmaScreen({ route, navigation }) {
       <TextInput
         style={styles.input}
         placeholder={`Nome da ${tipo === "turmas" ? "turma" : "aula"}`}
+        placeholderTextColor="#000"
         value={nome}
         onChangeText={setNome}
       />
       <TextInput
         style={styles.input}
         placeholder="Responsável"
+        placeholderTextColor="#000"
         value={responsavel}
         onChangeText={setResponsavel}
       />
       <TextInput
         style={styles.input}
         placeholder="Telefone"
+        placeholderTextColor="#000"
         value={telefone}
         onChangeText={setTelefone}
         keyboardType="phone-pad"
@@ -245,6 +248,7 @@ export default function AddTurmaScreen({ route, navigation }) {
       <TextInput
         style={styles.input}
         placeholder="Dia (ex.: segunda)"
+        placeholderTextColor="#000"
         value={turmaDia}
         onChangeText={setTurmaDia}
         editable={!data} // Bloqueia edição do dia se vier do calendário
@@ -252,12 +256,14 @@ export default function AddTurmaScreen({ route, navigation }) {
       <TextInput
         style={styles.input}
         placeholder="Início (ex.: 08:00)"
+        placeholderTextColor="#000"
         value={turmaInicio}
         onChangeText={setTurmaInicio}
       />
       <TextInput
         style={styles.input}
         placeholder="Fim (ex.: 09:30)"
+        placeholderTextColor="#000"
         value={turmaFim}
         onChangeText={setTurmaFim}
       />

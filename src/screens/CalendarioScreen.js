@@ -1319,18 +1319,21 @@ export default function CalendarioScreen({ navigation }) {
             <TextInput
               style={styles.input}
               placeholder="Nome"
+              placeholderTextColor="#000"
               value={editNome}
               onChangeText={setEditNome}
             />
             <TextInput
               style={styles.input}
               placeholder="Responsável"
+              placeholderTextColor="#000"
               value={editResponsavel}
               onChangeText={setEditResponsavel}
             />
             <TextInput
               style={styles.input}
               placeholder="Telefone"
+              placeholderTextColor="#000"
               value={editTelefone}
               onChangeText={setEditTelefone}
               keyboardType="phone-pad"
@@ -1338,12 +1341,14 @@ export default function CalendarioScreen({ navigation }) {
             <TextInput
               style={styles.input}
               placeholder="Horário Início (ex.: 17:00)"
+              placeholderTextColor="#000"
               value={editHorarioInicio}
               onChangeText={setEditHorarioInicio}
             />
             <TextInput
               style={styles.input}
               placeholder="Horário Fim (ex.: 18:00)"
+              placeholderTextColor="#000"
               value={editHorarioFim}
               onChangeText={setEditHorarioFim}
             />
@@ -1383,18 +1388,21 @@ export default function CalendarioScreen({ navigation }) {
             <TextInput
               style={styles.input}
               placeholder="Nome"
+              placeholderTextColor="#000"
               value={avulsoNome}
               onChangeText={setAvulsoNome}
             />
             <TextInput
               style={styles.input}
               placeholder="Responsável"
+              placeholderTextColor="#000"
               value={avulsoResponsavel}
               onChangeText={setAvulsoResponsavel}
             />
             <TextInput
               style={styles.input}
               placeholder="Telefone"
+              placeholderTextColor="#000"
               value={avulsoTelefone}
               onChangeText={setAvulsoTelefone}
               keyboardType="phone-pad"
@@ -1402,12 +1410,14 @@ export default function CalendarioScreen({ navigation }) {
             <TextInput
               style={styles.input}
               placeholder="Horário Início (ex.: 17:00)"
+              placeholderTextColor="#000"
               value={avulsoHorarioInicio}
               onChangeText={setAvulsoHorarioInicio}
             />
             <TextInput
               style={styles.input}
               placeholder="Horário Fim (ex.: 18:00)"
+              placeholderTextColor="#000"
               value={avulsoHorarioFim}
               onChangeText={setAvulsoHorarioFim}
             />
@@ -1441,18 +1451,21 @@ export default function CalendarioScreen({ navigation }) {
             <TextInput
               style={styles.input}
               placeholder="Nome"
+              placeholderTextColor="#000"
               value={rentalNome}
               onChangeText={setRentalNome}
             />
             <TextInput
               style={styles.input}
               placeholder="Responsável"
+              placeholderTextColor="#000"
               value={rentalResponsavel}
               onChangeText={setRentalResponsavel}
             />
             <TextInput
               style={styles.input}
               placeholder="Telefone"
+              placeholderTextColor="#000"
               value={rentalTelefone}
               onChangeText={setRentalTelefone}
               keyboardType="phone-pad"
@@ -1460,12 +1473,14 @@ export default function CalendarioScreen({ navigation }) {
             <TextInput
               style={styles.input}
               placeholder="Horário Início (ex.: 17:00)"
+              placeholderTextColor="#000"
               value={rentalHorarioInicio}
               onChangeText={setRentalHorarioInicio}
             />
             <TextInput
               style={styles.input}
               placeholder="Horário Fim (ex.: 18:00)"
+              placeholderTextColor="#000"
               value={rentalHorarioFim}
               onChangeText={setRentalHorarioFim}
             />
@@ -1496,18 +1511,21 @@ export default function CalendarioScreen({ navigation }) {
             <TextInput
               style={styles.input}
               placeholder="Nome da Aula"
+              placeholderTextColor="#000"
               value={aulaNome}
               onChangeText={setAulaNome}
             />
             <TextInput
               style={styles.input}
               placeholder="Responsável"
+              placeholderTextColor="#000"
               value={aulaResponsavel}
               onChangeText={setAulaResponsavel}
             />
             <TextInput
               style={styles.input}
               placeholder="Telefone"
+              placeholderTextColor="#000"
               value={aulaTelefone}
               onChangeText={setAulaTelefone}
               keyboardType="phone-pad"
@@ -1515,12 +1533,14 @@ export default function CalendarioScreen({ navigation }) {
             <TextInput
               style={styles.input}
               placeholder="Horário Início (ex.: 17:00)"
+              placeholderTextColor="#000"
               value={aulaHorarioInicio}
               onChangeText={setAulaHorarioInicio}
             />
             <TextInput
               style={styles.input}
               placeholder="Horário Fim (ex.: 18:00)"
+              placeholderTextColor="#000"
               value={aulaHorarioFim}
               onChangeText={setAulaHorarioFim}
             />
@@ -1560,6 +1580,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     backgroundColor: "#f0f0f0",
     borderRadius: 5,
+    color: "#000",
   },
   toggleSelectionButton: {
     backgroundColor: "#FFA500",

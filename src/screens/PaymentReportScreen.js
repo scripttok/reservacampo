@@ -407,6 +407,7 @@ export default function PaymentReportScreen({ navigation, route }) {
       <TextInput
         style={styles.searchInput}
         placeholder="Buscar por nome..."
+        placeholderTextColor="#000"
         value={searchQuery}
         onChangeText={setSearchQuery}
       />
@@ -482,6 +483,7 @@ export default function PaymentReportScreen({ navigation, route }) {
             <TextInput
               style={styles.input}
               placeholder="Ex.: 200.00"
+              placeholderTextColor="#000"
               keyboardType="numeric"
               value={valor}
               onChangeText={setValor}
@@ -490,6 +492,7 @@ export default function PaymentReportScreen({ navigation, route }) {
             <TextInput
               style={styles.input}
               placeholder="YYYY-MM-DD"
+              placeholderTextColor="#000"
               value={dataPagamento}
               onChangeText={setDataPagamento}
             />
@@ -497,6 +500,7 @@ export default function PaymentReportScreen({ navigation, route }) {
             <TextInput
               style={styles.input}
               placeholder="Ex.: João Silva"
+              placeholderTextColor="#000"
               value={nomeResponsavel}
               onChangeText={setNomeResponsavel}
             />

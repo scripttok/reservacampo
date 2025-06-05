@@ -4,33 +4,34 @@
   "main": "index.js",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.1.2",
     "@react-native-community/datetimepicker": "8.3.0",
     "@react-native-picker/picker": "2.11.0",
-    "@react-navigation/drawer": "^7.1.2",
-    "@react-navigation/native": "^7.0.15",
-    "@react-navigation/stack": "^7.1.2",
-    "expo": "~53.0.0",
+    "@react-navigation/drawer": "7.0.0",
+    "@react-navigation/native": "7.0.0",
+    "@react-navigation/stack": "7.0.0",
     "expo-sharing": "~13.1.5",
-    "expo-status-bar": "~2.2.3",
-    "expo-updates": "~0.28.13",
-    "firebase": "^11.4.0",
-    "fs-extra": "^11.3.0",
-    "react": "19.0.0",
-    "react-native": "0.79.2",
-    "react-native-calendars": "^1.1310.0",
+    "expo-status-bar": "2.2.3",
+    "expo-updates": "0.28.13",
+    "expo": "~53.0.9",
+    "firebase": "11.8.1",
+    "fs-extra": "11.3.0",
+    "react-native-calendars": "1.1312.0",
     "react-native-gesture-handler": "~2.24.0",
-    "react-native-reanimated": "~3.17.4",
+    "react-native-reanimated": "3.17.5",
     "react-native-safe-area-context": "5.4.0",
-    "react-native-screens": "~4.10.0"
+    "react-native-screens": "~4.10.0",
+    "react-native": "0.79.2",
+    "react": "19.0.0"
   },
   "devDependencies": {
-    "@babel/core": "^7.20.0"
+    "@babel/core": "^7.24.0",
+    "@react-native-community/cli": "^15.0.0"
   },
   "private": true
 }

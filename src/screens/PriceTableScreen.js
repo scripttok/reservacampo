@@ -58,6 +58,7 @@ export default function PriceTableScreen({ navigation }) {
           keyboardType="numeric"
           value={precoMensal}
           onChangeText={setprecoMensal}
+          placeholderTextColor="#000"
         />
         <Text style={styles.description}>
           Valor mensal cobrado das turmas cadastradas.
@@ -67,6 +68,7 @@ export default function PriceTableScreen({ navigation }) {
         <TextInput
           style={styles.input}
           placeholder="Ex.: 150.00"
+          placeholderTextColor="#000"
           keyboardType="numeric"
           value={precoAnual}
           onChangeText={setprecoAnual}
@@ -79,6 +81,7 @@ export default function PriceTableScreen({ navigation }) {
         <TextInput
           style={styles.input}
           placeholder="Ex.: 100.00"
+          placeholderTextColor="#000"
           keyboardType="numeric"
           value={precoAvulso}
           onChangeText={setPrecoAvulso}

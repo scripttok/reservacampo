@@ -44,6 +44,7 @@ export default function AddCampoScreen({ navigation, route }) {
         value={nome}
         onChangeText={setNome}
         placeholder="Digite o nome do campo"
+        placeholderTextColor="#000"
       />
       <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
         <Text style={styles.saveButtonText}>Salvar</Text>

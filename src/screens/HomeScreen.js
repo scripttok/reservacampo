@@ -477,6 +477,7 @@ export default function HomeScreen({ navigation, route }) {
             <TextInput
               style={styles.input}
               placeholder="Nome do campo"
+              placeholderTextColor="#000"
               value={novoCampoNome}
               onChangeText={setNovoCampoNome}
             />
@@ -510,6 +511,7 @@ export default function HomeScreen({ navigation, route }) {
             <TextInput
               style={styles.input}
               placeholder="Início (ex.: 07:00)"
+              placeholderTextColor="#000"
               value={horarioInicio}
               onChangeText={(text) => {
                 setHorarioInicio(text);
@@ -519,6 +521,7 @@ export default function HomeScreen({ navigation, route }) {
             <TextInput
               style={styles.input}
               placeholder="Fim (ex.: 23:00)"
+              placeholderTextColor="#000"
               value={horarioFim}
               onChangeText={(text) => {
                 setHorarioFim(text);

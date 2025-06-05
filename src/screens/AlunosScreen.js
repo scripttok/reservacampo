@@ -230,6 +230,7 @@ export default function AlunosScreen({ navigation }) {
       <TextInput
         style={styles.searchInput}
         placeholder="Buscar aluno por nome..."
+        placeholderTextColor="#000"
         value={searchText}
         onChangeText={setSearchText}
       />
@@ -261,18 +262,21 @@ export default function AlunosScreen({ navigation }) {
             <TextInput
               style={styles.input}
               placeholder="Nome"
+              placeholderTextColor="#000"
               value={nome}
               onChangeText={setNome}
             />
             <TextInput
               style={styles.input}
               placeholder="Responsável"
+              placeholderTextColor="#000"
               value={responsavel}
               onChangeText={setResponsavel}
             />
             <TextInput
               style={styles.input}
               placeholder="Telefone do Responsável"
+              placeholderTextColor="#000"
               value={telefoneResponsavel}
               onChangeText={setTelefoneResponsavel}
               keyboardType="phone-pad"
@@ -280,6 +284,7 @@ export default function AlunosScreen({ navigation }) {
             <TextInput
               style={styles.input}
               placeholder="Idade"
+              placeholderTextColor="#000"
               value={idade}
               onChangeText={setIdade}
               keyboardType="numeric"
@@ -438,6 +443,7 @@ const styles = StyleSheet.create({
   },
   picker: {
     width: "100%",
+    color: "#000",
   },
   modalButtons: {
     flexDirection: "row",
