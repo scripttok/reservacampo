@@ -134,6 +134,7 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     marginBottom: 10,
     backgroundColor: "#fff",
+    color: "black",
   },
   description: {
     fontSize: 14,

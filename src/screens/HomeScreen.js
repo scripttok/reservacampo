@@ -577,6 +577,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: "bold",
+
     color: "#fff",
   },
   campoContainer: {
@@ -601,6 +602,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "bold",
     marginBottom: 10,
+    color: "#2ecc71",
   },
   modalText: {
     fontSize: 16,
@@ -614,6 +616,7 @@ const styles = StyleSheet.create({
     borderColor: "#ddd",
     borderRadius: 5,
     marginBottom: 20,
+    color: "black",
   },
   modalButtons: {
     flexDirection: "row",

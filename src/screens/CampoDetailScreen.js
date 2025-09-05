@@ -15,6 +15,7 @@ import { escolinhaService } from "../services/escolinhaService";
 import { configService } from "../services/configService";
 import { db } from "../services/firebaseService";
 import { collection, query, where, getDocs } from "firebase/firestore";
+import { doc, deleteDoc } from "firebase/firestore";
 
 moment.locale("pt-br");
 
@@ -29,10 +30,7 @@ export default function CampoDetailScreen({ route, navigation }) {
   const [turmasDoCampo, setTurmasDoCampo] = useState(initialTurmas || []);
   const [aulasDoCampo, setAulasDoCampo] = useState([]);
   const [reservasDoFirestore, setReservasDoFirestore] = useState([]);
-  const [horarioFuncionamento, setHorarioFuncionamento] = useState({
-    inicio: "09:00",
-    fim: "23:00",
-  });
+  const [horarioFuncionamento, setHorarioFuncionamento] = useState(null); // Removido o valor hardcoded
 
   const diasDaSemana = [
     "domingo",
@@ -50,24 +48,31 @@ export default function CampoDetailScreen({ route, navigation }) {
 
   useEffect(() => {
     const fetchData = async () => {
-      const updatedTurmas = await turmaService.getTurmas();
-      const updatedAulas = await escolinhaService.getAulas();
-      const horario = await configService.getHorarioFuncionamento();
-      const reservas = await buscarReservasDoFirestore(campo.id);
+      try {
+        const updatedTurmas = await turmaService.getTurmas();
+        const updatedAulas = await escolinhaService.getAulas();
+        const horario = await configService.getHorarioFuncionamento();
+        const reservas = await buscarReservasDoFirestore(campo.id);
 
-      const turmasFiltradas = updatedTurmas.filter(
-        (t) => t.campoId === campo.id
-      );
-      const aulasFiltradas = updatedAulas.filter((a) => a.campoId === campo.id);
+        const turmasFiltradas = updatedTurmas.filter(
+          (t) => t.campoId === campo.id
+        );
+        const aulasFiltradas = updatedAulas.filter(
+          (a) => a.campoId === campo.id
+        );
 
-      "CampoDetailScreen: Turmas filtradas:", turmasFiltradas;
-      "CampoDetailScreen: Aulas filtradas:", aulasFiltradas;
-      "CampoDetailScreen: Reservas carregadas:", reservas;
+        console.log("CampoDetailScreen: Turmas filtradas:", turmasFiltradas);
+        console.log("CampoDetailScreen: Aulas filtradas:", aulasFiltradas);
+        console.log("CampoDetailScreen: Reservas carregadas:", reservas);
+        console.log("CampoDetailScreen: Horário de funcionamento:", horario);
 
-      setTurmasDoCampo(turmasFiltradas);
-      setAulasDoCampo(aulasFiltradas);
-      setReservasDoFirestore(reservas);
-      setHorarioFuncionamento(horario);
+        setTurmasDoCampo(turmasFiltradas);
+        setAulasDoCampo(aulasFiltradas);
+        setReservasDoFirestore(reservas);
+        setHorarioFuncionamento(horario);
+      } catch (error) {
+        console.error("Erro ao carregar dados:", error);
+      }
     };
 
     fetchData();
@@ -84,7 +89,7 @@ export default function CampoDetailScreen({ route, navigation }) {
       querySnapshot.forEach((doc) => {
         reservas.push({ id: doc.id, ...doc.data() });
       });
-      "CampoDetailScreen: Reservas do Firestore:", reservas;
+      console.log("CampoDetailScreen: Reservas do Firestore:", reservas);
       return reservas;
     } catch (error) {
       console.error("Erro ao buscar reservas do Firestore:", error);
@@ -108,12 +113,9 @@ export default function CampoDetailScreen({ route, navigation }) {
         const matchesDay = diaReserva === diaSelecionado;
         const isSameWeek = moment(reserva.data).isSame(moment(), "week");
 
-        // Lógica de filtragem por tipo de reserva e modo
         if (reserva.tipo === "avulso" || reserva.tipo === "mensal") {
-          // Avulsas e Mensais aparecem apenas no modo "turmas"
           return mode === "turmas" && matchesDay && isSameWeek;
         } else if (reserva.tipo === "anual") {
-          // Anuais aparecem apenas no modo "escolinha" e na semana atual
           return mode === "escolinha" && matchesDay && isSameWeek;
         }
         return false;
@@ -129,9 +131,13 @@ export default function CampoDetailScreen({ route, navigation }) {
       a.horarioInicio?.localeCompare(b.horarioInicio)
   );
 
-  "CampoDetailScreen: Itens do dia para renderizar:", itensDoDia;
+  console.log("CampoDetailScreen: Itens do dia para renderizar:", itensDoDia);
 
   const calcularHorariosDisponiveis = (inicio, fim, itensOcupados) => {
+    if (!inicio || !fim) {
+      return []; // Retorna vazio se horário de funcionamento não estiver definido
+    }
+
     const horarios = [];
     let currentTime = parseTime(inicio);
     const endTime = parseTime(fim);
@@ -176,6 +182,10 @@ export default function CampoDetailScreen({ route, navigation }) {
   };
 
   useEffect(() => {
+    if (!horarioFuncionamento) {
+      return; // Não calcula horários disponíveis até que o horário de funcionamento seja carregado
+    }
+
     const itensOcupados = [
       ...turmasDoCampo.filter(
         (item) => item.dia && item.dia.toLowerCase() === diaSelecionado
@@ -302,6 +312,8 @@ export default function CampoDetailScreen({ route, navigation }) {
     navigation.navigate("AddTurma", { campoId: campo.id, turma: item, mode });
   };
 
+  // Substituir a função handleDeleteTurma no arquivo onde ela está definida (provavelmente CampoDetailScreen.js)
+
   const handleDeleteTurma = async (id) => {
     try {
       if (mode === "turmas") {
@@ -361,17 +373,21 @@ export default function CampoDetailScreen({ route, navigation }) {
         style={styles.diasContainer}
       />
 
-      <FlatList
-        data={horariosDisponiveis}
-        renderItem={renderHorarioButton}
-        keyExtractor={(item) => `${item.inicio}-${item.fim}`}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.horariosContainer}
-        ListEmptyComponent={
-          <Text style={styles.noHorarioText}>Nenhum horário disponível</Text>
-        }
-      />
+      {horarioFuncionamento ? (
+        <FlatList
+          data={horariosDisponiveis}
+          renderItem={renderHorarioButton}
+          keyExtractor={(item) => `${item.inicio}-${item.fim}`}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.horariosContainer}
+          ListEmptyComponent={
+            <Text style={styles.noHorarioText}>Nenhum horário disponível</Text>
+          }
+        />
+      ) : (
+        <Text style={styles.noHorarioText}>Carregando horários...</Text>
+      )}
       <View style={styles.turmasContainer}>
         {itensDoDia.length > 0 ? (
           itensDoDia.map((item) => {

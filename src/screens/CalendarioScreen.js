@@ -1324,21 +1324,21 @@ export default function CalendarioScreen({ navigation }) {
             <TextInput
               style={styles.input}
               placeholder="Nome"
-              placeholderTextColor="#000"
+              placeholderTextColor="red"
               value={editNome}
               onChangeText={setEditNome}
             />
             <TextInput
               style={styles.input}
               placeholder="Responsável"
-              placeholderTextColor="#000"
+              placeholderTextColor="red"
               value={editResponsavel}
               onChangeText={setEditResponsavel}
             />
             <TextInput
               style={styles.input}
               placeholder="Telefone"
-              placeholderTextColor="#000"
+              placeholderTextColor="red"
               value={editTelefone}
               onChangeText={setEditTelefone}
               keyboardType="phone-pad"
@@ -1346,14 +1346,14 @@ export default function CalendarioScreen({ navigation }) {
             <TextInput
               style={styles.input}
               placeholder="Horário Início (ex.: 17:00)"
-              placeholderTextColor="#000"
+              placeholderTextColor="red"
               value={editHorarioInicio}
               onChangeText={setEditHorarioInicio}
             />
             <TextInput
               style={styles.input}
               placeholder="Horário Fim (ex.: 18:00)"
-              placeholderTextColor="#000"
+              placeholderTextColor="red"
               value={editHorarioFim}
               onChangeText={setEditHorarioFim}
             />
@@ -1675,6 +1675,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     width: "100%",
     fontSize: 16,
+    color: "black",
   },
   saveButton: {
     backgroundColor: "#007AFF",

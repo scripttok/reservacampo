@@ -202,6 +202,14 @@ export default function ReportsScreen({ navigation, route }) {
     const horariosOcupados = {};
 
     turmas.forEach((turma) => {
+      if (!turma || !turma.dia || typeof turma.dia !== "string") {
+        console.warn(
+          "ReportsScreen: Turma inválida ou sem dia definido:",
+          turma
+        );
+        return;
+      }
+
       const diaSemana = turma.dia.toLowerCase().replace("-feira", "");
       let currentDate = startOfMonth.clone();
       while (currentDate.isSameOrBefore(endOfMonth)) {
@@ -224,6 +232,13 @@ export default function ReportsScreen({ navigation, route }) {
     });
 
     reservas.forEach((reserva) => {
+      if (!reserva || !reserva.tipo || typeof reserva.tipo !== "string") {
+        console.warn(
+          "ReportsScreen: Reserva inválida ou sem tipo definido:",
+          reserva
+        );
+        return;
+      }
       const dataInicial = moment(reserva.data);
       const campoId = reserva.campoId;
       if (reserva.tipo === "mensal") {
@@ -809,7 +824,7 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 5,
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 80,
   },
   exportButtonText: {
     color: "#fff",

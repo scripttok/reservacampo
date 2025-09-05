@@ -427,6 +427,7 @@ const styles = StyleSheet.create({
     borderColor: "#ddd",
     borderRadius: 5,
     marginBottom: 15,
+    color: "black",
   },
   pickerContainer: {
     marginBottom: 15,

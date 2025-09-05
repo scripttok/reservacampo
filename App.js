@@ -1,9 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createDrawerNavigator } from "@react-navigation/drawer";
 import { createStackNavigator } from "@react-navigation/stack";
 import { DrawerContentScrollView, DrawerItem } from "@react-navigation/drawer";
-import { View, Text } from "react-native";
+import { View, ActivityIndicator } from "react-native";
 import HomeScreen from "./src/screens/HomeScreen";
 import CampoDetailScreen from "./src/screens/CampoDetailScreen";
 import AddCampoScreen from "./src/screens/AddCampoScreen";
@@ -13,6 +13,7 @@ import PriceTableScreen from "./src/screens/PriceTableScreen";
 import PaymentReportScreen from "./src/screens/PaymentReportScreen";
 import ReportsScreen from "./src/screens/ReportsScreen";
 import CalendarioScreen from "./src/screens/CalendarioScreen";
+import * as Updates from "expo-updates";
 
 const Drawer = createDrawerNavigator();
 const Stack = createStackNavigator();
@@ -47,7 +48,6 @@ function CustomDrawerContent(props) {
   const { navigation, setMode, mode } = props;
 
   const handleAddCampo = () => {
-    ("Drawer: Navegando para Home com modal de adicionar campo");
     navigation.navigate("HomeStack", {
       screen: "Home",
       params: { openAddModal: true, mode },
@@ -56,10 +56,9 @@ function CustomDrawerContent(props) {
   };
 
   const handleConfigHorarios = () => {
-    ("Drawer: Navegando para Home com modal de configurar horários");
     navigation.navigate("HomeStack", {
       screen: "Home",
-      params: { openConfig: true, mode }, // Usando openConfig em vez de openConfigModal
+      params: { openConfig: true, mode },
     });
     navigation.closeDrawer();
   };
@@ -136,7 +135,38 @@ function CustomDrawerContent(props) {
 }
 
 export default function App() {
-  const [mode, setMode] = useState("turmas"); // Estado inicial: Turmas
+  const [mode, setMode] = useState("turmas");
+  const [isLoadingUpdate, setIsLoadingUpdate] = useState(true);
+
+  useEffect(() => {
+    const checkForUpdates = async () => {
+      try {
+        const update = await Updates.checkForUpdateAsync();
+        if (update.isAvailable) {
+          console.log("🔄 Update disponível, baixando...");
+          await Updates.fetchUpdateAsync();
+          console.log("✅ Update baixado, reiniciando app...");
+          await Updates.reloadAsync();
+        } else {
+          console.log("✅ App já está atualizado.");
+        }
+      } catch (error) {
+        console.log("❌ Erro ao buscar update OTA:", error);
+      } finally {
+        setIsLoadingUpdate(false);
+      }
+    };
+
+    checkForUpdates();
+  }, []);
+
+  if (isLoadingUpdate) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" color="#007AFF" />
+      </View>
+    );
+  }
 
   return (
     <NavigationContainer>

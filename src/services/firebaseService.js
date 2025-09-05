@@ -12,6 +12,28 @@ const firebaseConfig = {
   databaseURL: "https://projetocampo-3e349-default-rtdb.firebaseio.com",
 };
 
+// Cliente Paulo henrrique
+// const firebaseConfig = {
+//   apiKey: "AIzaSyAWIBmk7MZ7MobzP5B81iNAEYHynQb58nc",
+//   authDomain: "paulo-herrique.firebaseapp.com",
+//   databaseURL: "https://paulo-herrique-default-rtdb.firebaseio.com",
+//   projectId: "paulo-herrique",
+//   storageBucket: "paulo-herrique.firebasestorage.app",
+//   messagingSenderId: "919839358789",
+//   appId: "1:919839358789:android:aad896afee048f0c8f882c",
+// };
+
+// cliente Jair
+// const firebaseConfig = {
+//   apiKey: "AIzaSyDRXmlkOFErKWtn-6H7MOtYbm8VrkhtteA",
+//   authDomain: "campo-manager-x.firebaseapp.com",
+//   projectId: "campo-manager-x",
+//   storageBucket: "campo-manager-x.firebasestorage.app",
+//   messagingSenderId: "23614089217",
+//   appId: "1:23614089217:android:474516828c9a8cce18f800",
+//   databaseURL: "https://campo-manager-x-default-rtdb.firebaseio.com",
+// };
+
 ("firebaseService: Inicializando Firebase");
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
